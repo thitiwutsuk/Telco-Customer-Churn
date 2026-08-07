@@ -6,3 +6,5 @@ scipy
 jupyter
 nbconvert
 ipykernel
+scikit-learn
+imbalanced-learn

@@ -1,16 +1,17 @@
-# Telco Customer Churn — Exploratory Data Analysis
+# Telco Customer Churn — EDA & Predictive Modeling
 
-This project performs a deep Exploratory Data Analysis (EDA) on the **IBM Telco Customer Churn**
-dataset to find which customer factors are associated with churn (customers leaving the service).
-The focus is on statistical and descriptive analysis — **no predictive modeling** is included.
+This project analyzes the **IBM Telco Customer Churn** dataset to find which customer factors are
+associated with churn (customers leaving the service). It starts with a deep Exploratory Data
+Analysis (EDA) — statistical and descriptive — and then builds predictive models (Logistic
+Regression and Random Forest) to quantify churn drivers and cross-check the EDA findings.
 
 ## Project Files
 
 | File | Purpose |
 |---|---|
 | `data/WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset |
-| `telco_churn_eda.ipynb` | Main notebook containing the full EDA, organized into steps per the methodology below |
-| `requirements.txt` | Python packages required |
+| `telco_churn_eda.ipynb` | Main notebook containing the full EDA + modeling workflow, organized into steps per the methodology below |
+| `requirements.txt` | Python packages required (EDA: pandas/numpy/matplotlib/seaborn/scipy; ML: scikit-learn/imbalanced-learn) |
 | `.venv/` | Virtual environment (isolates installed libraries from the system Python; no need to edit/commit) |
 | `README.md` | This file |
 
@@ -51,8 +52,9 @@ jupyter nbconvert --to notebook --execute --inplace telco_churn_eda.ipynb
 
 ## Methodology
 
-The analysis is organized into 11 steps, each corresponding to one section in `telco_churn_eda.ipynb`.
-Steps are done in order, since each step builds understanding or cleans data that the next step depends on.
+The analysis is organized into 18 steps, each corresponding to one section in `telco_churn_eda.ipynb`.
+Steps 1-11 are descriptive EDA; Steps 12-18 build and interpret predictive models. Steps are done in
+order, since each step builds understanding or cleans/prepares data that the next step depends on.
 
 ### ✅ Step 1: Data Loading & Structural Overview *(done)*
 Load the data and inspect its basic structure (`shape`, `dtypes`, `.info()`, `.head()`, `.isnull().sum()`).
@@ -70,9 +72,13 @@ blanks (because they were empty strings, not `NaN`).
 **Principle:** data cleaning must always "verify assumptions before deleting/modifying data" to avoid
 silently introducing bias by dropping rows without understanding why they're missing.
 
-### ⬜ Step 3: Univariate Analysis — Target Variable
+### ✅ Step 3: Univariate Analysis — Target Variable *(done)*
 Examine the overall Churn proportion (base rate), since every subgroup comparison in later steps will be
 benchmarked against this rate.
+**Findings:** No = 73.4% (5,163 customers), Yes = 26.6% (1,869 customers) — this is the base rate every
+later subgroup churn rate gets compared against. Chart labels are in Thai; `plt.rcParams['font.family']
+= 'Tahoma'` was set to fix Thai glyphs not rendering with matplotlib's default font, confirmed working
+on re-run.
 
 ### ⬜ Step 4: Univariate Analysis — All Features
 Examine the distribution of every variable (categorical: countplot/proportions, numeric:
@@ -102,9 +108,38 @@ Synthesize descriptive, rule-based high-risk segments from the results of Steps 
 ### ⬜ Step 11: Summary of Key Insights & Recommendations
 Summarize the main insights, risk segments, and limitations of the analysis (correlation ≠ causation).
 
+### ⬜ Step 12: Feature Engineering & Encoding for ML
+Encode `Churn` to 1/0, one-hot encode categorical features (`drop_first=True` to avoid the dummy
+variable trap), split into train/test (`stratify=y`, 80/20, `random_state=42`), and scale numeric
+features with `StandardScaler` fit on the training set only (to avoid data leakage).
+
+### ⬜ Step 13: Handle Class Imbalance with SMOTE
+Apply SMOTE oversampling to the **training set only** so the model sees enough churn examples to learn
+from, while the test set keeps the real-world ~26.6% churn proportion for fair evaluation.
+
+### ⬜ Step 14: Train Model 1 — Logistic Regression
+An interpretable baseline model — its coefficients translate directly into churn odds, easy to explain
+to a business audience.
+
+### ⬜ Step 15: Train Model 2 — Random Forest
+A model that captures non-linear relationships and feature interactions, generally stronger in
+practice; used to see whether the added complexity is worth it over the linear baseline.
+
+### ⬜ Step 16: Model Evaluation & Comparison
+Evaluate both models on the untouched (non-SMOTE) test set using confusion matrix, precision/recall/F1
+(for the churn class specifically), and ROC-AUC — accuracy alone is misleading on imbalanced data.
+
+### ⬜ Step 17: Feature Importance & Interpretation
+Extract Logistic Regression coefficients and Random Forest `feature_importances_`, and cross-check them
+against the statistical findings from Steps 5-6 (Chi-square/Mann-Whitney) for agreement or conflict.
+
+### ⬜ Step 18: ML Summary & Final Business Recommendations
+Tie the ML results together with the EDA findings into one coherent set of business recommendations,
+noting limitations (SMOTE uses synthetic data; results are still correlational, not causal).
+
 > The full plan with the rationale behind each step is available at
 > `/Users/athens/.claude/plans/insight-data-toasty-blum.md`
 
 ## Current Status
 
-Completed through **Step 2** — the data is clean and ready for Step 3 onward.
+Completed through **Step 3**. Steps 4-18 (remaining EDA + full ML modeling phase) are not started yet.
