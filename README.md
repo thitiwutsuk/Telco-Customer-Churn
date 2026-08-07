@@ -8,7 +8,7 @@ The focus is on statistical and descriptive analysis — **no predictive modelin
 
 | File | Purpose |
 |---|---|
-| `WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset |
+| `data/WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset |
 | `telco_churn_eda.ipynb` | Main notebook containing the full EDA, organized into steps per the methodology below |
 | `requirements.txt` | Python packages required |
 | `.venv/` | Virtual environment (isolates installed libraries from the system Python; no need to edit/commit) |
