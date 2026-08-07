@@ -80,9 +80,17 @@ later subgroup churn rate gets compared against. Chart labels are in Thai; `plt.
 = 'Tahoma'` was set to fix Thai glyphs not rendering with matplotlib's default font, confirmed working
 on re-run.
 
-### ⬜ Step 4: Univariate Analysis — All Features
+### ✅ Step 4: Univariate Analysis — All Features *(done)*
 Examine the distribution of every variable (categorical: countplot/proportions, numeric:
 histogram/boxplot/`describe()`) before relating them to the target.
+**Findings:** 16 categorical + 3 numeric features surveyed. `Contract` skews heavily toward Month-to-month
+(55.1%), `InternetService`/`PaymentMethod` have 3-4 categories (not just Yes/No), and several service
+columns (`OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`,
+`StreamingMovies`) carry a "No internet service" category (21.6%) distinct from a plain "No" — must be
+kept separate when building crosstabs in Step 5. `TotalCharges` is right-skewed (mean 2,283 vs. median
+1,397); `tenure` has a bimodal/U-shaped distribution (many very new and many very long-tenured customers);
+`MonthlyCharges` is also bimodal (a low cluster around customers with no internet service, a high cluster
+around those with internet + add-ons). No IQR outliers found in any of the 3 numeric columns.
 
 ### ⬜ Step 5: Bivariate Analysis — Categorical Features vs Churn
 Compare churn *rate* (not raw counts) across categories using crosstabs, and confirm statistical
@@ -142,4 +150,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 3**. Steps 4-18 (remaining EDA + full ML modeling phase) are not started yet.
+Completed through **Step 4**. Steps 5-18 (remaining EDA + full ML modeling phase) are not started yet.
