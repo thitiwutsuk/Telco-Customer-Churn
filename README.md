@@ -109,9 +109,17 @@ kept separate when building crosstabs in Step 5. `TotalCharges` is right-skewed 
 `MonthlyCharges` is also bimodal (a low cluster around customers with no internet service, a high cluster
 around those with internet + add-ons). No IQR outliers found in any of the 3 numeric columns.
 
-### ⬜ Step 5: Bivariate Analysis — Categorical Features vs Churn
+### ✅ Step 5: Bivariate Analysis — Categorical Features vs Churn *(done)*
 Compare churn *rate* (not raw counts) across categories using crosstabs, and confirm statistical
 significance with a **Chi-square test**.
+**Findings:** 14 of 16 categorical features are statistically significant (p < 0.05); only `gender` and
+`PhoneService` show no relationship with churn. Highest-risk categories, all well above the 26.6% base
+rate: `Contract` = Month-to-month (42.7% churn vs. 2.8% for Two year), `InternetService` = Fiber optic
+(41.9%), no `OnlineSecurity` (41.8%) or `TechSupport` (41.6%), `PaymentMethod` = Electronic check
+(45.3%, highest of all), `PaperlessBilling` = Yes (33.6% vs. 16.4%), and `SeniorCitizen` = Yes (41.7% vs.
+23.7%). These high-risk categories cluster together (new, month-to-month, fiber, no add-on services) —
+an early signal of the risk segment to be defined in Step 10. Customers with no internet service at all
+show a low 7.4% churn rate across every add-on-service column.
 
 ### ⬜ Step 6: Bivariate Analysis — Numeric Features vs Churn
 Boxplot/violin plots split by Churn, tested with the **Mann-Whitney U test** (non-parametric, since
@@ -167,4 +175,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 4**. Steps 5-18 (remaining EDA + full ML modeling phase) are not started yet.
+Completed through **Step 5**. Steps 6-18 (remaining EDA + full ML modeling phase) are not started yet.
