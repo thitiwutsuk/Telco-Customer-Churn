@@ -5,14 +5,31 @@ associated with churn (customers leaving the service). It starts with a deep Exp
 Analysis (EDA) — statistical and descriptive — and then builds predictive models (Logistic
 Regression and Random Forest) to quantify churn drivers and cross-check the EDA findings.
 
-## Project Files
+## Project Structure
 
-| File | Purpose |
+```
+Telco Customer Churn/
+├── data/
+│   └── WA_Fn-UseC_-Telco-Customer-Churn.csv   # Original raw dataset
+├── telco_churn_eda.ipynb                      # Main notebook: full EDA + ML modeling workflow
+├── requirements.txt                           # Python dependencies (EDA + ML)
+├── .venv/                                     # Virtual environment (local only, not committed)
+├── .vscode/
+│   └── settings.json                          # Hides .venv/ from the VS Code explorer & search
+├── .claude/
+│   └── settings.json                          # Shared Claude Code permission allowlist
+├── .gitignore
+└── README.md                                  # This file
+```
+
+| File / Folder | Purpose |
 |---|---|
 | `data/WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset |
 | `telco_churn_eda.ipynb` | Main notebook containing the full EDA + modeling workflow, organized into steps per the methodology below |
 | `requirements.txt` | Python packages required (EDA: pandas/numpy/matplotlib/seaborn/scipy; ML: scikit-learn/imbalanced-learn) |
 | `.venv/` | Virtual environment (isolates installed libraries from the system Python; no need to edit/commit) |
+| `.vscode/settings.json` | Editor config that hides `.venv/` from the file explorer and search |
+| `.claude/settings.json` | Shared Claude Code permission allowlist (reduces repeated approval prompts) |
 | `README.md` | This file |
 
 ## Dataset
