@@ -1,5 +1,11 @@
 # Telco Customer Churn — EDA & Predictive Modeling
 
+![Python](https://img.shields.io/badge/python-3.9-blue)
+![Pandas](https://img.shields.io/badge/pandas-2.3-150458)
+![scikit--learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Progress](https://img.shields.io/badge/progress-step%2012%20of%2018-yellow)
+
 This project analyzes the **IBM Telco Customer Churn** dataset to find which customer factors are
 associated with churn (customers leaving the service). It starts with a deep Exploratory Data
 Analysis (EDA) — statistical and descriptive — and then builds predictive models (Logistic
