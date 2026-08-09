@@ -73,6 +73,12 @@ The analysis is organized into 18 steps, each corresponding to one section in `t
 Steps 1-11 are descriptive EDA; Steps 12-18 build and interpret predictive models. Steps are done in
 order, since each step builds understanding or cleans/prepares data that the next step depends on.
 
+**Note on writing style:** Steps 1-7 explain every concept in full each time (aimed at readers with no
+programming/stats background). After reviewing that this got repetitive, Steps 8 onward keep the same
+beginner-friendly quality for genuinely new content, but no longer re-explain concepts already covered
+earlier (e.g., why to use rates instead of raw counts, what a p-value means) — they reference the step
+where it was first explained instead. Steps 1-7 were left as-is rather than rewritten.
+
 ### ✅ Step 1: Data Loading & Structural Overview *(done)*
 Load the data and inspect its basic structure (`shape`, `dtypes`, `.info()`, `.head()`, `.isnull().sum()`).
 Before any analysis, it's essential to understand the "shape" of the data first — each column's data type
@@ -141,12 +147,19 @@ positive (+0.19), and `TotalCharges`'s correlation with churn (-0.20) is mostly 
 strong tie to `tenure` rather than an independent effect — a multicollinearity note to carry into the ML
 modeling phase (Steps 12+).
 
-### ⬜ Step 8: Multivariate / Interaction Analysis
+### ✅ Step 8: Multivariate / Interaction Analysis *(done)*
 Analyze interactions such as Contract × InternetService, Contract × tenure bucket, to identify at-risk
 customer "personas."
+**Findings:** risk compounds when factors combine. Month-to-month + Fiber optic = 54.6% churn vs. Two
+year + No internet = 0.8% (~70x difference). Month-to-month customers in their first 12 months churn at
+51.4%, dropping steadily to 22.2% by months 61-72; Two year customers stay near 0-4% regardless of
+tenure. Highest-risk profile: month-to-month contract + Fiber optic + under 1 year tenure.
 
-### ⬜ Step 9: Tenure-based Retention Curve
+### ✅ Step 9: Tenure-based Retention Curve *(done)*
 Churn rate across tenure ranges, to see at which point in the customer lifecycle churn is highest.
+**Findings:** churn rate peaks at month 1 (62.0%), stays high through months 1-6 (avg ~48.7%), then
+declines steadily to just 8.0% by months 60-72 (1.7% at month 72). Months 1-6 are the critical retention
+window — customers who survive past it are increasingly unlikely to churn.
 
 ### ⬜ Step 10: Customer Risk Segmentation
 Synthesize descriptive, rule-based high-risk segments from the results of Steps 5-9.
@@ -188,4 +201,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 7**. Steps 8-18 (remaining EDA + full ML modeling phase) are not started yet.
+Completed through **Step 9**. Steps 10-18 (remaining EDA + full ML modeling phase) are not started yet.
