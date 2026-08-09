@@ -121,9 +121,16 @@ rate: `Contract` = Month-to-month (42.7% churn vs. 2.8% for Two year), `Internet
 an early signal of the risk segment to be defined in Step 10. Customers with no internet service at all
 show a low 7.4% churn rate across every add-on-service column.
 
-### ⬜ Step 6: Bivariate Analysis — Numeric Features vs Churn
+### ✅ Step 6: Bivariate Analysis — Numeric Features vs Churn *(done)*
 Boxplot/violin plots split by Churn, tested with the **Mann-Whitney U test** (non-parametric, since
 normality of the data isn't assumed).
+**Findings:** all 3 numeric features are statistically significant (p < 0.05). Median `tenure` is 10
+months for churned customers vs. 38 months for retained ones (churners leave early). Median
+`MonthlyCharges` is higher for churners (79.65 vs. 64.45) — they pay more per month. Median
+`TotalCharges` is lower for churners (703.55 vs. 1,683.60), which mostly reflects their shorter tenure
+rather than being a new independent signal. Combined picture: churners tend to be newer customers paying
+above-average monthly rates, consistent with the Step 5 finding that Fiber optic (pricier) and
+month-to-month contracts drive the highest churn.
 
 ### ⬜ Step 7: Correlation Analysis
 Heatmap of numeric variables to check for baseline multicollinearity.
@@ -175,4 +182,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 5**. Steps 6-18 (remaining EDA + full ML modeling phase) are not started yet.
+Completed through **Step 6**. Steps 7-18 (remaining EDA + full ML modeling phase) are not started yet.
