@@ -27,6 +27,36 @@ git push                           # ส่งขึ้น GitHub
 git add README.md telco_churn_eda.ipynb
 ```
 
+## รูปแบบการเขียน Commit Message (มาตรฐานสากล: Conventional Commits)
+
+```
+<type>(<scope>): <คำอธิบายสั้นๆ>
+
+<รายละเอียดเพิ่มเติม (ถ้ามี)>
+```
+
+**ประเภท (type) ที่ใช้บ่อย:**
+
+| Type | ใช้เมื่อ | ตัวอย่าง |
+|---|---|---|
+| `feat` | เพิ่มฟีเจอร์ใหม่ | `feat: add step 10 customer risk segmentation` |
+| `fix` | แก้บั๊ก | `fix: correct churn rate calculation in step 5` |
+| `docs` | แก้เอกสาร (README ฯลฯ) | `docs: update readme methodology for step 8-9` |
+| `refactor` | ปรับโค้ดโดยไม่เปลี่ยนผลลัพธ์ | `refactor: simplify tenure bucket logic` |
+| `chore` | งานจุกจิก ไม่กระทบโค้ดหลัก | `chore: add scikit-learn to requirements.txt` |
+| `style` | จัดฟอร์แมต ไม่กระทบ logic | `style: fix thai font rendering in charts` |
+| `test` | เพิ่ม/แก้ test | `test: verify notebook runs end to end` |
+
+**กติกาสั้นๆ:**
+1. บรรทัดแรก (subject) ไม่เกิน ~50-72 ตัวอักษร ใช้ **imperative mood** (สั่งให้ทำ เช่น `add` ไม่ใช่ `added`/`adds`)
+2. ตัวพิมพ์เล็กทั้งหมดใน type/scope และไม่ต้องมีจุดท้ายประโยค
+3. ถ้าต้องอธิบายเพิ่ม เว้นบรรทัดว่าง 1 บรรทัดแล้วเขียนต่อ — เน้นอธิบาย "ทำไม" ถึงแก้ ไม่ใช่ "อะไร" (โค้ด diff บอกอยู่แล้วว่าแก้อะไร)
+
+**ตัวอย่างการใช้กับ `git commit`:**
+```bash
+git commit -m "feat: add step 5 categorical vs churn analysis"
+```
+
 ## ดูประวัติการเปลี่ยนแปลง
 
 ```bash

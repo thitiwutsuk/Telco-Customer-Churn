@@ -161,11 +161,20 @@ Churn rate across tenure ranges, to see at which point in the customer lifecycle
 declines steadily to just 8.0% by months 60-72 (1.7% at month 72). Months 1-6 are the critical retention
 window — customers who survive past it are increasingly unlikely to churn.
 
-### ⬜ Step 10: Customer Risk Segmentation
+### ✅ Step 10: Customer Risk Segmentation *(done)*
 Synthesize descriptive, rule-based high-risk segments from the results of Steps 5-9.
+**Findings:** defined segment = Month-to-month + Fiber optic + tenure < 12 months + no OnlineSecurity/
+TechSupport. Size: 737 customers (10.5% of all customers), churn rate 73.5% (2.8x the 26.6% base rate).
+This segment alone accounts for 29.0% of all company-wide churn, with ~59,419 baht/month in at-risk
+revenue — a small, high-leverage group for retention efforts.
 
-### ⬜ Step 11: Summary of Key Insights & Recommendations
+### ✅ Step 11: Summary of Key Insights & Recommendations *(done)*
 Summarize the main insights, risk segments, and limitations of the analysis (correlation ≠ causation).
+Closes out the EDA phase (Steps 1-11) with a consolidated findings table, business recommendations
+(target the 1-6 month retention window, incentivize long-term contracts, bundle security/support
+services for new fiber customers, review the Electronic check payment experience), and explicit
+limitations (correlation ≠ causation, no time dimension, hand-picked segment thresholds) before moving
+into predictive modeling in Step 12.
 
 ### ⬜ Step 12: Feature Engineering & Encoding for ML
 Encode `Churn` to 1/0, one-hot encode categorical features (`drop_first=True` to avoid the dummy
@@ -201,4 +210,5 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 9**. Steps 10-18 (remaining EDA + full ML modeling phase) are not started yet.
+Completed through **Step 11** — the full EDA phase is done. Steps 12-18 (ML modeling phase) are not
+started yet.
