@@ -10,8 +10,10 @@ Regression and Random Forest) to quantify churn drivers and cross-check the EDA 
 ```
 Telco Customer Churn/
 ├── data/
-│   └── WA_Fn-UseC_-Telco-Customer-Churn.csv   # Original raw dataset
-├── telco_churn_eda.ipynb                      # Main notebook: full EDA + ML modeling workflow
+│   ├── WA_Fn-UseC_-Telco-Customer-Churn.csv   # Original raw dataset
+│   └── telco_churn_clean.csv                  # Cleaned dataset (output of eda notebook, input to modeling notebook)
+├── telco_churn_eda.ipynb                      # Notebook 1: Steps 1-11 (data cleaning + EDA)
+├── telco_churn_modeling.ipynb                 # Notebook 2: Steps 12-18 (feature engineering + ML modeling)
 ├── requirements.txt                           # Python dependencies (EDA + ML)
 ├── .venv/                                     # Virtual environment (local only, not committed)
 ├── .vscode/
@@ -25,7 +27,9 @@ Telco Customer Churn/
 | File / Folder | Purpose |
 |---|---|
 | `data/WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset |
-| `telco_churn_eda.ipynb` | Main notebook containing the full EDA + modeling workflow, organized into steps per the methodology below |
+| `data/telco_churn_clean.csv` | Cleaned dataset saved at the end of `telco_churn_eda.ipynb`, loaded at the start of `telco_churn_modeling.ipynb` — avoids duplicating the cleaning code across both notebooks |
+| `telco_churn_eda.ipynb` | Steps 1-11: data cleaning and exploratory data analysis |
+| `telco_churn_modeling.ipynb` | Steps 12-18: feature engineering and predictive modeling (continues from the EDA notebook) |
 | `requirements.txt` | Python packages required (EDA: pandas/numpy/matplotlib/seaborn/scipy; ML: scikit-learn/imbalanced-learn) |
 | `.venv/` | Virtual environment (isolates installed libraries from the system Python; no need to edit/commit) |
 | `.vscode/settings.json` | Editor config that hides `.venv/` from the file explorer and search |
@@ -60,18 +64,23 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Open/edit the notebook with Jupyter or VS Code (select the kernel from `.venv`).
+Open/edit the notebooks with Jupyter or VS Code (select the kernel from `.venv`).
 
-Run the full notebook non-interactively (execute + save outputs back into the file):
+Run both notebooks non-interactively, **in order** (the modeling notebook loads `data/telco_churn_clean.csv`,
+which the EDA notebook produces — it must be run first at least once):
 ```bash
 jupyter nbconvert --to notebook --execute --inplace telco_churn_eda.ipynb
+jupyter nbconvert --to notebook --execute --inplace telco_churn_modeling.ipynb
 ```
 
 ## Methodology
 
-The analysis is organized into 18 steps, each corresponding to one section in `telco_churn_eda.ipynb`.
-Steps 1-11 are descriptive EDA; Steps 12-18 build and interpret predictive models. Steps are done in
-order, since each step builds understanding or cleans/prepares data that the next step depends on.
+The analysis is organized into 18 steps, split across two notebooks: **Steps 1-11** (descriptive EDA) are
+in `telco_churn_eda.ipynb`, and **Steps 12-18** (predictive modeling) are in `telco_churn_modeling.ipynb`.
+The EDA notebook saves its cleaned dataframe to `data/telco_churn_clean.csv` at the end, which the
+modeling notebook loads at the start — this avoids duplicating the data-cleaning code across both files.
+Steps are done in order, since each step builds understanding or cleans/prepares data that the next step
+depends on.
 
 **Note on writing style:** Steps 1-7 explain every concept in full each time (aimed at readers with no
 programming/stats background). After reviewing that this got repetitive, Steps 8 onward keep the same
@@ -176,10 +185,16 @@ services for new fiber customers, review the Electronic check payment experience
 limitations (correlation ≠ causation, no time dimension, hand-picked segment thresholds) before moving
 into predictive modeling in Step 12.
 
-### ⬜ Step 12: Feature Engineering & Encoding for ML
+*(Steps 12-18 below are in `telco_churn_modeling.ipynb`)*
+
+### ✅ Step 12: Feature Engineering & Encoding for ML *(done)*
 Encode `Churn` to 1/0, one-hot encode categorical features (`drop_first=True` to avoid the dummy
 variable trap), split into train/test (`stratify=y`, 80/20, `random_state=42`), and scale numeric
 features with `StandardScaler` fit on the training set only (to avoid data leakage).
+**Result:** 16 categorical columns expanded to 27 one-hot columns; final feature matrix `X` is 7,032
+rows × 30 columns (27 encoded categorical + 3 scaled numeric). Train (5,625 rows) and test (1,407 rows)
+both preserved the 26.6% churn rate via `stratify=y`. `tenure_bucket` from Step 8 was deliberately
+excluded from `X` as redundant with `tenure`.
 
 ### ⬜ Step 13: Handle Class Imbalance with SMOTE
 Apply SMOTE oversampling to the **training set only** so the model sees enough churn examples to learn
@@ -210,5 +225,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 11** — the full EDA phase is done. Steps 12-18 (ML modeling phase) are not
-started yet.
+Completed through **Step 12**. Steps 13-18 (remaining ML modeling phase) are not started yet.
