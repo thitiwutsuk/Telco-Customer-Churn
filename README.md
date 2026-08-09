@@ -4,7 +4,7 @@
 ![Pandas](https://img.shields.io/badge/pandas-2.3-150458)
 ![scikit--learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Progress](https://img.shields.io/badge/progress-step%2012%20of%2018-yellow)
+![Progress](https://img.shields.io/badge/progress-step%2014%20of%2018-yellow)
 
 This project analyzes the **IBM Telco Customer Churn** dataset to find which customer factors are
 associated with churn (customers leaving the service). It starts with a deep Exploratory Data
@@ -226,14 +226,31 @@ features with `StandardScaler` fit on the training set only (to avoid data leaka
 - Final feature matrix `X`: 7,032 rows × 30 columns (27 encoded categorical + 3 scaled numeric)
 - Train (5,625 rows) and test (1,407 rows) both preserved the 26.6% churn rate via `stratify=y`
 - `tenure_bucket` from Step 8 was deliberately excluded from `X` as redundant with `tenure`
+- **Bug fix:** `pd.get_dummies()` on pandas 2.x returns `bool` columns rather than 0/1 integers; left mixed
+  with the `float64` scaled numeric columns, this silently produces an `object`-dtype array when converted
+  for scikit-learn, which caused numerical overflow warnings during model training in Step 14. Fixed by
+  chaining `.astype(int)` onto the one-hot encoding step so the whole feature matrix is uniformly numeric.
 
-### ⬜ Step 13: Handle Class Imbalance with SMOTE
+### ✅ Step 13: Handle Class Imbalance with SMOTE *(done)*
 Apply SMOTE oversampling to the **training set only** so the model sees enough churn examples to learn
 from, while the test set keeps the real-world ~26.6% churn proportion for fair evaluation.
 
-### ⬜ Step 14: Train Model 1 — Logistic Regression
+**Result:**
+- Before SMOTE: training set had 4,130 non-churn vs. 1,495 churn examples
+- After SMOTE: both classes balanced to 4,130 each (synthetic churn examples generated, not real customers)
+- `X_test`/`y_test` were left untouched, still reflecting the real ~26.6% churn rate for fair evaluation in Step 16
+
+### ✅ Step 14: Train Model 1 — Logistic Regression *(done)*
 An interpretable baseline model — its coefficients translate directly into churn odds, easy to explain
 to a business audience.
+
+**Result:**
+- Trained on the SMOTE-balanced training set, predicted on the untouched test set (1,407 customers)
+- Predicted 536 customers as churn vs. 374 actual churners — a reasonable sanity check (detailed
+  precision/recall/F1/ROC-AUC comparison against Random Forest happens in Step 16)
+- Verified the fitted model is numerically sound: finite coefficients (range -5.2 to 7.2), predicted
+  probabilities all within a valid [0.001, 0.999] range, converged in ~68 iterations (well under the
+  `max_iter=1000` cap) — confirms the Step 12 dtype fix and the RuntimeWarning suppression below are safe
 
 ### ⬜ Step 15: Train Model 2 — Random Forest
 A model that captures non-linear relationships and feature interactions, generally stronger in
@@ -256,4 +273,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 12**. Steps 13-18 (remaining ML modeling phase) are not started yet.
+Completed through **Step 14**. Steps 15-18 (remaining ML modeling phase) are not started yet.
