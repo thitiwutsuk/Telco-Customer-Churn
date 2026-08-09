@@ -132,8 +132,14 @@ rather than being a new independent signal. Combined picture: churners tend to b
 above-average monthly rates, consistent with the Step 5 finding that Fiber optic (pricier) and
 month-to-month contracts drive the highest churn.
 
-### ⬜ Step 7: Correlation Analysis
+### ✅ Step 7: Correlation Analysis *(done)*
 Heatmap of numeric variables to check for baseline multicollinearity.
+**Findings:** `tenure`↔`TotalCharges` correlate strongly (0.83) and `MonthlyCharges`↔`TotalCharges` also
+correlate (0.65) — both expected from how `TotalCharges` accumulates, not new signal. Against `Churn`:
+`tenure` is the strongest and most independent numeric predictor (-0.35), `MonthlyCharges` is weakly
+positive (+0.19), and `TotalCharges`'s correlation with churn (-0.20) is mostly a reflection of its
+strong tie to `tenure` rather than an independent effect — a multicollinearity note to carry into the ML
+modeling phase (Steps 12+).
 
 ### ⬜ Step 8: Multivariate / Interaction Analysis
 Analyze interactions such as Contract × InternetService, Contract × tenure bucket, to identify at-risk
@@ -182,4 +188,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 6**. Steps 7-18 (remaining EDA + full ML modeling phase) are not started yet.
+Completed through **Step 7**. Steps 8-18 (remaining EDA + full ML modeling phase) are not started yet.
