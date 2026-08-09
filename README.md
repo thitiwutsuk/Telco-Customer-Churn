@@ -10,27 +10,32 @@ Regression and Random Forest) to quantify churn drivers and cross-check the EDA 
 ```
 Telco Customer Churn/
 ├── data/
-│   ├── WA_Fn-UseC_-Telco-Customer-Churn.csv   # Original raw dataset
-│   └── telco_churn_clean.csv                  # Cleaned dataset (output of eda notebook, input to modeling notebook)
-├── telco_churn_eda.ipynb                      # Notebook 1: Steps 1-11 (data cleaning + EDA)
-├── telco_churn_modeling.ipynb                 # Notebook 2: Steps 12-18 (feature engineering + ML modeling)
-├── requirements.txt                           # Python dependencies (EDA + ML)
-├── .venv/                                     # Virtual environment (local only, not committed)
+│   ├── raw/
+│   │   └── WA_Fn-UseC_-Telco-Customer-Churn.csv   # Original raw dataset (never modified)
+│   └── processed/
+│       └── telco_churn_clean.csv                  # Cleaned dataset (output of eda notebook, input to modeling notebook)
+├── notebooks/
+│   ├── telco_churn_eda.ipynb                      # Notebook 1: Steps 1-11 (data cleaning + EDA)
+│   └── telco_churn_modeling.ipynb                 # Notebook 2: Steps 12-18 (feature engineering + ML modeling)
+├── requirements.txt                               # Python dependencies, version-pinned (EDA + ML)
+├── LICENSE                                        # MIT license
+├── .venv/                                         # Virtual environment (local only, not committed)
 ├── .vscode/
-│   └── settings.json                          # Hides .venv/ from the VS Code explorer & search
+│   └── settings.json                              # Hides .venv/ from the VS Code explorer & search
 ├── .claude/
-│   └── settings.json                          # Shared Claude Code permission allowlist
+│   └── settings.json                              # Shared Claude Code permission allowlist
 ├── .gitignore
-└── README.md                                  # This file
+└── README.md                                      # This file
 ```
 
 | File / Folder | Purpose |
 |---|---|
-| `data/WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset |
-| `data/telco_churn_clean.csv` | Cleaned dataset saved at the end of `telco_churn_eda.ipynb`, loaded at the start of `telco_churn_modeling.ipynb` — avoids duplicating the cleaning code across both notebooks |
-| `telco_churn_eda.ipynb` | Steps 1-11: data cleaning and exploratory data analysis |
-| `telco_churn_modeling.ipynb` | Steps 12-18: feature engineering and predictive modeling (continues from the EDA notebook) |
-| `requirements.txt` | Python packages required (EDA: pandas/numpy/matplotlib/seaborn/scipy; ML: scikit-learn/imbalanced-learn) |
+| `data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv` | Original raw dataset — treated as immutable, never edited in place |
+| `data/processed/telco_churn_clean.csv` | Cleaned dataset saved at the end of `notebooks/telco_churn_eda.ipynb`, loaded at the start of `notebooks/telco_churn_modeling.ipynb` — avoids duplicating the cleaning code across both notebooks |
+| `notebooks/telco_churn_eda.ipynb` | Steps 1-11: data cleaning and exploratory data analysis |
+| `notebooks/telco_churn_modeling.ipynb` | Steps 12-18: feature engineering and predictive modeling (continues from the EDA notebook) |
+| `requirements.txt` | Python packages required, pinned to the exact tested versions (EDA: pandas/numpy/matplotlib/seaborn/scipy; ML: scikit-learn/imbalanced-learn) |
+| `LICENSE` | MIT license |
 | `.venv/` | Virtual environment (isolates installed libraries from the system Python; no need to edit/commit) |
 | `.vscode/settings.json` | Editor config that hides `.venv/` from the file explorer and search |
 | `.claude/settings.json` | Shared Claude Code permission allowlist (reduces repeated approval prompts) |
@@ -66,21 +71,22 @@ pip install -r requirements.txt
 
 Open/edit the notebooks with Jupyter or VS Code (select the kernel from `.venv`).
 
-Run both notebooks non-interactively, **in order** (the modeling notebook loads `data/telco_churn_clean.csv`,
-which the EDA notebook produces — it must be run first at least once):
+Run both notebooks non-interactively, **in order**, from inside `notebooks/` (the modeling notebook loads
+`data/processed/telco_churn_clean.csv`, which the EDA notebook produces — it must be run first at least once):
 ```bash
+cd notebooks
 jupyter nbconvert --to notebook --execute --inplace telco_churn_eda.ipynb
 jupyter nbconvert --to notebook --execute --inplace telco_churn_modeling.ipynb
 ```
 
 ## Methodology
 
-The analysis is organized into 18 steps, split across two notebooks: **Steps 1-11** (descriptive EDA) are
-in `telco_churn_eda.ipynb`, and **Steps 12-18** (predictive modeling) are in `telco_churn_modeling.ipynb`.
-The EDA notebook saves its cleaned dataframe to `data/telco_churn_clean.csv` at the end, which the
-modeling notebook loads at the start — this avoids duplicating the data-cleaning code across both files.
-Steps are done in order, since each step builds understanding or cleans/prepares data that the next step
-depends on.
+The analysis is organized into 18 steps, split across two notebooks in `notebooks/`: **Steps 1-11**
+(descriptive EDA) are in `telco_churn_eda.ipynb`, and **Steps 12-18** (predictive modeling) are in
+`telco_churn_modeling.ipynb`. The EDA notebook saves its cleaned dataframe to
+`data/processed/telco_churn_clean.csv` at the end, which the modeling notebook loads at the start — this
+avoids duplicating the data-cleaning code across both files. Steps are done in order, since each step
+builds understanding or cleans/prepares data that the next step depends on.
 
 **Note on writing style:** Steps 1-7 explain every concept in full each time (aimed at readers with no
 programming/stats background). After reviewing that this got repetitive, Steps 8 onward keep the same

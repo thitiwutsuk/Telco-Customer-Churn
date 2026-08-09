@@ -24,7 +24,7 @@ git push                           # ส่งขึ้น GitHub
 
 ถ้าอยากเลือก add เฉพาะบางไฟล์แทน `git add .` ทั้งหมด:
 ```bash
-git add README.md telco_churn_eda.ipynb
+git add README.md notebooks/telco_churn_eda.ipynb
 ```
 
 ## รูปแบบการเขียน Commit Message (มาตรฐานสากล: Conventional Commits)
