@@ -104,9 +104,11 @@ where it was first explained instead. Steps 1-7 were left as-is rather than rewr
 Load the data and inspect its basic structure (`shape`, `dtypes`, `.info()`, `.head()`, `.isnull().sum()`).
 Before any analysis, it's essential to understand the "shape" of the data first — each column's data type
 (categorical/numeric/identifier) and whether pandas detects any missing values.
-**Findings:** the dataset has 7,043×21 rows/columns as expected; `TotalCharges` was read as `object` even
-though it should be numeric; `.isnull()` reported 0 missing values even though `TotalCharges` had hidden
-blanks (because they were empty strings, not `NaN`).
+
+**Findings:**
+- Dataset has 7,043×21 rows/columns, as expected
+- `TotalCharges` was read as `object` even though it should be numeric
+- `.isnull()` reported 0 missing values even though `TotalCharges` had hidden blanks (they were empty strings, not `NaN`)
 
 ### ✅ Step 2: Data Cleaning & Type Correction *(done)*
 - Converted `TotalCharges` to numeric with `pd.to_numeric(errors='coerce')` so unconvertible values become
@@ -119,83 +121,98 @@ silently introducing bias by dropping rows without understanding why they're mis
 ### ✅ Step 3: Univariate Analysis — Target Variable *(done)*
 Examine the overall Churn proportion (base rate), since every subgroup comparison in later steps will be
 benchmarked against this rate.
-**Findings:** No = 73.4% (5,163 customers), Yes = 26.6% (1,869 customers) — this is the base rate every
-later subgroup churn rate gets compared against. Chart labels are in Thai; `plt.rcParams['font.family']
-= 'Tahoma'` was set to fix Thai glyphs not rendering with matplotlib's default font, confirmed working
-on re-run.
+
+**Findings:**
+- No = 73.4% (5,163 customers), Yes = 26.6% (1,869 customers) — this is the base rate every later subgroup churn rate gets compared against
+- Chart labels are in Thai; `plt.rcParams['font.family'] = 'Tahoma'` was set to fix Thai glyphs not rendering with matplotlib's default font, confirmed working on re-run
 
 ### ✅ Step 4: Univariate Analysis — All Features *(done)*
 Examine the distribution of every variable (categorical: countplot/proportions, numeric:
 histogram/boxplot/`describe()`) before relating them to the target.
-**Findings:** 16 categorical + 3 numeric features surveyed. `Contract` skews heavily toward Month-to-month
-(55.1%), `InternetService`/`PaymentMethod` have 3-4 categories (not just Yes/No), and several service
-columns (`OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`,
-`StreamingMovies`) carry a "No internet service" category (21.6%) distinct from a plain "No" — must be
-kept separate when building crosstabs in Step 5. `TotalCharges` is right-skewed (mean 2,283 vs. median
-1,397); `tenure` has a bimodal/U-shaped distribution (many very new and many very long-tenured customers);
-`MonthlyCharges` is also bimodal (a low cluster around customers with no internet service, a high cluster
-around those with internet + add-ons). No IQR outliers found in any of the 3 numeric columns.
+
+**Findings:**
+- 16 categorical + 3 numeric features surveyed
+- `Contract` skews heavily toward Month-to-month (55.1%)
+- `InternetService`/`PaymentMethod` have 3-4 categories (not just Yes/No)
+- Several service columns (`OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`, `StreamingMovies`) carry a "No internet service" category (21.6%) distinct from a plain "No" — must be kept separate when building crosstabs in Step 5
+- `TotalCharges` is right-skewed (mean 2,283 vs. median 1,397)
+- `tenure` has a bimodal/U-shaped distribution (many very new and many very long-tenured customers)
+- `MonthlyCharges` is also bimodal (a low cluster around customers with no internet service, a high cluster around those with internet + add-ons)
+- No IQR outliers found in any of the 3 numeric columns
 
 ### ✅ Step 5: Bivariate Analysis — Categorical Features vs Churn *(done)*
 Compare churn *rate* (not raw counts) across categories using crosstabs, and confirm statistical
 significance with a **Chi-square test**.
-**Findings:** 14 of 16 categorical features are statistically significant (p < 0.05); only `gender` and
-`PhoneService` show no relationship with churn. Highest-risk categories, all well above the 26.6% base
-rate: `Contract` = Month-to-month (42.7% churn vs. 2.8% for Two year), `InternetService` = Fiber optic
-(41.9%), no `OnlineSecurity` (41.8%) or `TechSupport` (41.6%), `PaymentMethod` = Electronic check
-(45.3%, highest of all), `PaperlessBilling` = Yes (33.6% vs. 16.4%), and `SeniorCitizen` = Yes (41.7% vs.
-23.7%). These high-risk categories cluster together (new, month-to-month, fiber, no add-on services) —
-an early signal of the risk segment to be defined in Step 10. Customers with no internet service at all
-show a low 7.4% churn rate across every add-on-service column.
+
+**Findings:**
+- 14 of 16 categorical features are statistically significant (p < 0.05); only `gender` and `PhoneService` show no relationship with churn
+- `Contract` = Month-to-month: 42.7% churn vs. 2.8% for Two year
+- `InternetService` = Fiber optic: 41.9% churn
+- No `OnlineSecurity`: 41.8% churn; no `TechSupport`: 41.6% churn
+- `PaymentMethod` = Electronic check: 45.3% churn (highest of all payment methods)
+- `PaperlessBilling` = Yes: 33.6% churn vs. 16.4% for No
+- `SeniorCitizen` = Yes: 41.7% churn vs. 23.7% for No
+- These high-risk categories cluster together (new, month-to-month, fiber, no add-on services) — an early signal of the risk segment defined in Step 10
+- Customers with no internet service at all show a low 7.4% churn rate across every add-on-service column
 
 ### ✅ Step 6: Bivariate Analysis — Numeric Features vs Churn *(done)*
 Boxplot/violin plots split by Churn, tested with the **Mann-Whitney U test** (non-parametric, since
 normality of the data isn't assumed).
-**Findings:** all 3 numeric features are statistically significant (p < 0.05). Median `tenure` is 10
-months for churned customers vs. 38 months for retained ones (churners leave early). Median
-`MonthlyCharges` is higher for churners (79.65 vs. 64.45) — they pay more per month. Median
-`TotalCharges` is lower for churners (703.55 vs. 1,683.60), which mostly reflects their shorter tenure
-rather than being a new independent signal. Combined picture: churners tend to be newer customers paying
-above-average monthly rates, consistent with the Step 5 finding that Fiber optic (pricier) and
-month-to-month contracts drive the highest churn.
+
+**Findings:**
+- All 3 numeric features are statistically significant (p < 0.05)
+- Median `tenure`: 10 months for churned customers vs. 38 months for retained ones (churners leave early)
+- Median `MonthlyCharges`: higher for churners (79.65 vs. 64.45) — they pay more per month
+- Median `TotalCharges`: lower for churners (703.55 vs. 1,683.60), mostly reflecting their shorter tenure rather than being a new independent signal
+- Combined picture: churners tend to be newer customers paying above-average monthly rates, consistent with the Step 5 finding that Fiber optic (pricier) and month-to-month contracts drive the highest churn
 
 ### ✅ Step 7: Correlation Analysis *(done)*
 Heatmap of numeric variables to check for baseline multicollinearity.
-**Findings:** `tenure`↔`TotalCharges` correlate strongly (0.83) and `MonthlyCharges`↔`TotalCharges` also
-correlate (0.65) — both expected from how `TotalCharges` accumulates, not new signal. Against `Churn`:
-`tenure` is the strongest and most independent numeric predictor (-0.35), `MonthlyCharges` is weakly
-positive (+0.19), and `TotalCharges`'s correlation with churn (-0.20) is mostly a reflection of its
-strong tie to `tenure` rather than an independent effect — a multicollinearity note to carry into the ML
-modeling phase (Steps 12+).
+
+**Findings:**
+- `tenure`↔`TotalCharges` correlate strongly (0.83) — expected from how `TotalCharges` accumulates, not new signal
+- `MonthlyCharges`↔`TotalCharges` also correlate (0.65) — same reason, not new signal
+- Against `Churn`: `tenure` is the strongest and most independent numeric predictor (-0.35)
+- `MonthlyCharges` vs. `Churn`: weakly positive (+0.19)
+- `TotalCharges` vs. `Churn` (-0.20) is mostly a reflection of its strong tie to `tenure` rather than an independent effect — a multicollinearity note to carry into the ML modeling phase (Steps 12+)
 
 ### ✅ Step 8: Multivariate / Interaction Analysis *(done)*
 Analyze interactions such as Contract × InternetService, Contract × tenure bucket, to identify at-risk
 customer "personas."
-**Findings:** risk compounds when factors combine. Month-to-month + Fiber optic = 54.6% churn vs. Two
-year + No internet = 0.8% (~70x difference). Month-to-month customers in their first 12 months churn at
-51.4%, dropping steadily to 22.2% by months 61-72; Two year customers stay near 0-4% regardless of
-tenure. Highest-risk profile: month-to-month contract + Fiber optic + under 1 year tenure.
+
+**Findings:**
+- Risk compounds when factors combine: Month-to-month + Fiber optic = 54.6% churn vs. Two year + No internet = 0.8% (~70x difference)
+- Month-to-month customers in their first 12 months churn at 51.4%, dropping steadily to 22.2% by months 61-72
+- Two year customers stay near 0-4% churn regardless of tenure
+- Highest-risk profile: month-to-month contract + Fiber optic + under 1 year tenure
 
 ### ✅ Step 9: Tenure-based Retention Curve *(done)*
 Churn rate across tenure ranges, to see at which point in the customer lifecycle churn is highest.
-**Findings:** churn rate peaks at month 1 (62.0%), stays high through months 1-6 (avg ~48.7%), then
-declines steadily to just 8.0% by months 60-72 (1.7% at month 72). Months 1-6 are the critical retention
-window — customers who survive past it are increasingly unlikely to churn.
+
+**Findings:**
+- Churn rate peaks at month 1 (62.0%)
+- Stays high through months 1-6 (avg ~48.7%)
+- Declines steadily to just 8.0% by months 60-72 (1.7% at month 72)
+- Months 1-6 are the critical retention window — customers who survive past it are increasingly unlikely to churn
 
 ### ✅ Step 10: Customer Risk Segmentation *(done)*
 Synthesize descriptive, rule-based high-risk segments from the results of Steps 5-9.
-**Findings:** defined segment = Month-to-month + Fiber optic + tenure < 12 months + no OnlineSecurity/
-TechSupport. Size: 737 customers (10.5% of all customers), churn rate 73.5% (2.8x the 26.6% base rate).
-This segment alone accounts for 29.0% of all company-wide churn, with ~59,419 baht/month in at-risk
-revenue — a small, high-leverage group for retention efforts.
+
+**Findings:**
+- Defined segment: Month-to-month + Fiber optic + tenure < 12 months + no OnlineSecurity/TechSupport
+- Size: 737 customers (10.5% of all customers)
+- Churn rate: 73.5% (2.8x the 26.6% base rate)
+- This segment alone accounts for 29.0% of all company-wide churn
+- ~59,419 baht/month in at-risk revenue — a small, high-leverage group for retention efforts
 
 ### ✅ Step 11: Summary of Key Insights & Recommendations *(done)*
 Summarize the main insights, risk segments, and limitations of the analysis (correlation ≠ causation).
-Closes out the EDA phase (Steps 1-11) with a consolidated findings table, business recommendations
-(target the 1-6 month retention window, incentivize long-term contracts, bundle security/support
-services for new fiber customers, review the Electronic check payment experience), and explicit
-limitations (correlation ≠ causation, no time dimension, hand-picked segment thresholds) before moving
-into predictive modeling in Step 12.
+Closes out the EDA phase (Steps 1-11) before moving into predictive modeling in Step 12.
+
+**Contents:**
+- A consolidated findings table pulling together Steps 3-10
+- Business recommendations: target the 1-6 month retention window, incentivize long-term contracts, bundle security/support services for new fiber customers, review the Electronic check payment experience
+- Explicit limitations: correlation ≠ causation, no time dimension in the data, hand-picked segment thresholds
 
 *(Steps 12-18 below are in `telco_churn_modeling.ipynb`)*
 
@@ -203,10 +220,12 @@ into predictive modeling in Step 12.
 Encode `Churn` to 1/0, one-hot encode categorical features (`drop_first=True` to avoid the dummy
 variable trap), split into train/test (`stratify=y`, 80/20, `random_state=42`), and scale numeric
 features with `StandardScaler` fit on the training set only (to avoid data leakage).
-**Result:** 16 categorical columns expanded to 27 one-hot columns; final feature matrix `X` is 7,032
-rows × 30 columns (27 encoded categorical + 3 scaled numeric). Train (5,625 rows) and test (1,407 rows)
-both preserved the 26.6% churn rate via `stratify=y`. `tenure_bucket` from Step 8 was deliberately
-excluded from `X` as redundant with `tenure`.
+
+**Result:**
+- 16 categorical columns expanded to 27 one-hot columns
+- Final feature matrix `X`: 7,032 rows × 30 columns (27 encoded categorical + 3 scaled numeric)
+- Train (5,625 rows) and test (1,407 rows) both preserved the 26.6% churn rate via `stratify=y`
+- `tenure_bucket` from Step 8 was deliberately excluded from `X` as redundant with `tenure`
 
 ### ⬜ Step 13: Handle Class Imbalance with SMOTE
 Apply SMOTE oversampling to the **training set only** so the model sees enough churn examples to learn
