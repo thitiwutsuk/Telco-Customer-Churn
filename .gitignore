@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
-.claude/settings.local.json
+.claude/
+.vscode/
 GIT_COMMANDS.md
