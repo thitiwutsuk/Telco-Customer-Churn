@@ -4,7 +4,7 @@
 ![Pandas](https://img.shields.io/badge/pandas-2.3-150458)
 ![scikit--learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Progress](https://img.shields.io/badge/progress-step%2014%20of%2018-yellow)
+![Progress](https://img.shields.io/badge/progress-step%2016%20of%2018-yellow)
 
 This project analyzes the **IBM Telco Customer Churn** dataset to find which customer factors are
 associated with churn (customers leaving the service). It starts with a deep Exploratory Data
@@ -252,13 +252,33 @@ to a business audience.
   probabilities all within a valid [0.001, 0.999] range, converged in ~68 iterations (well under the
   `max_iter=1000` cap) — confirms the Step 12 dtype fix and the RuntimeWarning suppression below are safe
 
-### ⬜ Step 15: Train Model 2 — Random Forest
+### ✅ Step 15: Train Model 2 — Random Forest *(done)*
 A model that captures non-linear relationships and feature interactions, generally stronger in
 practice; used to see whether the added complexity is worth it over the linear baseline.
 
-### ⬜ Step 16: Model Evaluation & Comparison
+**Result:**
+- Trained (`n_estimators=200, random_state=42`) on the same SMOTE-balanced training set as Step 14, predicted on the same untouched test set
+- Predicted 437 customers as churn vs. 374 actual churners
+- No warnings during training (unlike Logistic Regression) — tree-based models aren't affected by the linear-optimizer numerical issues from Step 14
+- Both models' predictions now ready for a rigorous side-by-side comparison in Step 16
+
+### ✅ Step 16: Model Evaluation & Comparison *(done)*
 Evaluate both models on the untouched (non-SMOTE) test set using confusion matrix, precision/recall/F1
 (for the churn class specifically), and ROC-AUC — accuracy alone is misleading on imbalanced data.
+
+**Result:**
+
+| Metric | Logistic Regression | Random Forest |
+|---|---|---|
+| Accuracy | 74.6% | **77.2%** |
+| Precision (churn) | 51.5% | **56.1%** |
+| Recall (churn) | **73.8%** | 65.5% |
+| F1 (churn) | **0.607** | 0.604 |
+| ROC-AUC | **0.827** | 0.816 |
+
+- Random Forest wins on accuracy/precision (fewer false alarms); Logistic Regression wins on recall/ROC-AUC (catches more actual churners)
+- For a churn problem, missing an actual churner (false negative) is costlier than a false alarm, so **Logistic Regression is the better choice here** despite being the simpler model
+- A concrete case where added model complexity didn't translate into a better outcome for the business objective
 
 ### ⬜ Step 17: Feature Importance & Interpretation
 Extract Logistic Regression coefficients and Random Forest `feature_importances_`, and cross-check them
@@ -273,4 +293,4 @@ noting limitations (SMOTE uses synthetic data; results are still correlational, 
 
 ## Current Status
 
-Completed through **Step 14**. Steps 15-18 (remaining ML modeling phase) are not started yet.
+Completed through **Step 16**. Steps 17-18 (remaining ML modeling phase) are not started yet.
