@@ -4,7 +4,7 @@
 ![Pandas](https://img.shields.io/badge/pandas-2.3-150458)
 ![scikit--learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Progress](https://img.shields.io/badge/progress-step%2016%20of%2018-yellow)
+![Progress](https://img.shields.io/badge/progress-complete%20(18%2F18)-brightgreen)
 
 This project analyzes the **IBM Telco Customer Churn** dataset to find which customer factors are
 associated with churn (customers leaving the service). It starts with a deep Exploratory Data
@@ -280,17 +280,34 @@ Evaluate both models on the untouched (non-SMOTE) test set using confusion matri
 - For a churn problem, missing an actual churner (false negative) is costlier than a false alarm, so **Logistic Regression is the better choice here** despite being the simpler model
 - A concrete case where added model complexity didn't translate into a better outcome for the business objective
 
-### ⬜ Step 17: Feature Importance & Interpretation
+### ✅ Step 17: Feature Importance & Interpretation *(done)*
 Extract Logistic Regression coefficients and Random Forest `feature_importances_`, and cross-check them
 against the statistical findings from Steps 5-6 (Chi-square/Mann-Whitney) for agreement or conflict.
 
-### ⬜ Step 18: ML Summary & Final Business Recommendations
+**Result:**
+- Factors all 3 methods agree drive churn: `Contract` (long-term = protective), `OnlineSecurity`/`TechSupport` (having them = protective), `MonthlyCharges` (higher = riskier)
+- `tenure`: confirmed by Random Forest (#1 importance, 17.4%) and EDA, but doesn't appear in Logistic Regression's top 10 — its signal gets split with `TotalCharges`/`MonthlyCharges` due to the multicollinearity flagged back in Step 7
+- **Conflict found:** `InternetService_Fiber optic` has a *negative* Logistic Regression coefficient (-5.21), implying it reduces churn — directly contradicting the Step 5 finding that Fiber optic has the highest churn rate (41.9%). Root cause confirmed: Fiber optic customers pay far more on average (91.50 vs. 58.09 for DSL vs. 21.08 for no internet), a 0.79 correlation with `MonthlyCharges`, causing the two correlated features to split credit for the same effect in ways that distort each individual coefficient
+- **Second conflict:** `gender_Male` lands in Random Forest's top 10 despite Step 5's Chi-square test finding no significant relationship with churn — a reminder that Random Forest always assigns nonzero importance to every feature, so its rankings alone can overstate a weak/non-existent effect and should be checked against a significance test
+
+### ✅ Step 18: ML Summary & Final Business Recommendations *(done)*
 Tie the ML results together with the EDA findings into one coherent set of business recommendations,
 noting limitations (SMOTE uses synthetic data; results are still correlational, not causal).
+
+**Result:** chose Logistic Regression over Random Forest despite lower accuracy, because its higher recall
+catches more actual churners — the costlier error to avoid. Confirmed `Contract`, `OnlineSecurity`/
+`TechSupport`, and `MonthlyCharges` as the highest-confidence churn drivers (agreed on by EDA statistics,
+Logistic Regression coefficients, and Random Forest importances). Delivered 5 business recommendations
+(target the 1-6 month retention window, incentivize long-term contracts, bundle security/support for new
+fiber customers, review the Electronic check payment experience, use the model for proactive customer
+outreach) and documented project-wide limitations (correlation ≠ causation, no time dimension, synthetic
+SMOTE data, no hyperparameter tuning or cross-validation, hand-picked segment thresholds).
 
 > The full plan with the rationale behind each step is available at
 > `/Users/athens/.claude/plans/insight-data-toasty-blum.md`
 
 ## Current Status
 
-Completed through **Step 16**. Steps 17-18 (remaining ML modeling phase) are not started yet.
+**All 18 steps complete.** Both notebooks (`telco_churn_eda.ipynb`, `telco_churn_modeling.ipynb`) run
+end-to-end with no errors or warnings. See Step 18 above for the final findings and business
+recommendations.
