@@ -103,7 +103,7 @@ beginner-friendly quality for genuinely new content, but no longer re-explain co
 earlier (e.g., why to use rates instead of raw counts, what a p-value means) — they reference the step
 where it was first explained instead. Steps 1-7 were left as-is rather than rewritten.
 
-### ✅ Step 1: Data Loading & Structural Overview *(done)*
+### Step 1: Data Loading & Structural Overview *(done)*
 Load the data and inspect its basic structure (`shape`, `dtypes`, `.info()`, `.head()`, `.isnull().sum()`).
 Before any analysis, it's essential to understand the "shape" of the data first — each column's data type
 (categorical/numeric/identifier) and whether pandas detects any missing values.
@@ -113,7 +113,7 @@ Before any analysis, it's essential to understand the "shape" of the data first 
 - `TotalCharges` was read as `object` even though it should be numeric
 - `.isnull()` reported 0 missing values even though `TotalCharges` had hidden blanks (they were empty strings, not `NaN`)
 
-### ✅ Step 2: Data Cleaning & Type Correction *(done)*
+### Step 2: Data Cleaning & Type Correction *(done)*
 - Converted `TotalCharges` to numeric with `pd.to_numeric(errors='coerce')` so unconvertible values become
   detectable `NaN`s.
 - Always verify assumptions before dropping data: confirmed all 11 `NaN` rows have `tenure == 0` before dropping them.
@@ -121,7 +121,7 @@ Before any analysis, it's essential to understand the "shape" of the data first 
 **Principle:** data cleaning must always "verify assumptions before deleting/modifying data" to avoid
 silently introducing bias by dropping rows without understanding why they're missing.
 
-### ✅ Step 3: Univariate Analysis — Target Variable *(done)*
+### Step 3: Univariate Analysis — Target Variable *(done)*
 Examine the overall Churn proportion (base rate), since every subgroup comparison in later steps will be
 benchmarked against this rate.
 
@@ -129,7 +129,7 @@ benchmarked against this rate.
 - No = 73.4% (5,163 customers), Yes = 26.6% (1,869 customers) — this is the base rate every later subgroup churn rate gets compared against
 - Chart labels are in Thai; `plt.rcParams['font.family'] = 'Tahoma'` was set to fix Thai glyphs not rendering with matplotlib's default font, confirmed working on re-run
 
-### ✅ Step 4: Univariate Analysis — All Features *(done)*
+### Step 4: Univariate Analysis — All Features *(done)*
 Examine the distribution of every variable (categorical: countplot/proportions, numeric:
 histogram/boxplot/`describe()`) before relating them to the target.
 
@@ -143,7 +143,7 @@ histogram/boxplot/`describe()`) before relating them to the target.
 - `MonthlyCharges` is also bimodal (a low cluster around customers with no internet service, a high cluster around those with internet + add-ons)
 - No IQR outliers found in any of the 3 numeric columns
 
-### ✅ Step 5: Bivariate Analysis — Categorical Features vs Churn *(done)*
+### Step 5: Bivariate Analysis — Categorical Features vs Churn *(done)*
 Compare churn *rate* (not raw counts) across categories using crosstabs, and confirm statistical
 significance with a **Chi-square test**.
 
@@ -158,7 +158,7 @@ significance with a **Chi-square test**.
 - These high-risk categories cluster together (new, month-to-month, fiber, no add-on services) — an early signal of the risk segment defined in Step 10
 - Customers with no internet service at all show a low 7.4% churn rate across every add-on-service column
 
-### ✅ Step 6: Bivariate Analysis — Numeric Features vs Churn *(done)*
+### Step 6: Bivariate Analysis — Numeric Features vs Churn *(done)*
 Boxplot/violin plots split by Churn, tested with the **Mann-Whitney U test** (non-parametric, since
 normality of the data isn't assumed).
 
@@ -169,7 +169,7 @@ normality of the data isn't assumed).
 - Median `TotalCharges`: lower for churners (703.55 vs. 1,683.60), mostly reflecting their shorter tenure rather than being a new independent signal
 - Combined picture: churners tend to be newer customers paying above-average monthly rates, consistent with the Step 5 finding that Fiber optic (pricier) and month-to-month contracts drive the highest churn
 
-### ✅ Step 7: Correlation Analysis *(done)*
+### Step 7: Correlation Analysis *(done)*
 Heatmap of numeric variables to check for baseline multicollinearity.
 
 **Findings:**
@@ -179,7 +179,7 @@ Heatmap of numeric variables to check for baseline multicollinearity.
 - `MonthlyCharges` vs. `Churn`: weakly positive (+0.19)
 - `TotalCharges` vs. `Churn` (-0.20) is mostly a reflection of its strong tie to `tenure` rather than an independent effect — a multicollinearity note to carry into the ML modeling phase (Steps 12+)
 
-### ✅ Step 8: Multivariate / Interaction Analysis *(done)*
+### Step 8: Multivariate / Interaction Analysis *(done)*
 Analyze interactions such as Contract × InternetService, Contract × tenure bucket, to identify at-risk
 customer "personas."
 
@@ -189,7 +189,7 @@ customer "personas."
 - Two year customers stay near 0-4% churn regardless of tenure
 - Highest-risk profile: month-to-month contract + Fiber optic + under 1 year tenure
 
-### ✅ Step 9: Tenure-based Retention Curve *(done)*
+### Step 9: Tenure-based Retention Curve *(done)*
 Churn rate across tenure ranges, to see at which point in the customer lifecycle churn is highest.
 
 **Findings:**
@@ -198,7 +198,7 @@ Churn rate across tenure ranges, to see at which point in the customer lifecycle
 - Declines steadily to just 8.0% by months 60-72 (1.7% at month 72)
 - Months 1-6 are the critical retention window — customers who survive past it are increasingly unlikely to churn
 
-### ✅ Step 10: Customer Risk Segmentation *(done)*
+### Step 10: Customer Risk Segmentation *(done)*
 Synthesize descriptive, rule-based high-risk segments from the results of Steps 5-9.
 
 **Findings:**
@@ -208,7 +208,7 @@ Synthesize descriptive, rule-based high-risk segments from the results of Steps 
 - This segment alone accounts for 29.0% of all company-wide churn
 - ~59,419 baht/month in at-risk revenue — a small, high-leverage group for retention efforts
 
-### ✅ Step 11: Summary of Key Insights & Recommendations *(done)*
+### Step 11: Summary of Key Insights & Recommendations *(done)*
 Summarize the main insights, risk segments, and limitations of the analysis (correlation ≠ causation).
 Closes out the EDA phase (Steps 1-11) before moving into predictive modeling in Step 12.
 
@@ -219,7 +219,7 @@ Closes out the EDA phase (Steps 1-11) before moving into predictive modeling in 
 
 *(Steps 12-18 below are in `telco_churn_modeling.ipynb`)*
 
-### ✅ Step 12: Feature Engineering & Encoding for ML *(done)*
+### Step 12: Feature Engineering & Encoding for ML *(done)*
 Encode `Churn` to 1/0, one-hot encode categorical features (`drop_first=True` to avoid the dummy
 variable trap), split into train/test (`stratify=y`, 80/20, `random_state=42`), and scale numeric
 features with `StandardScaler` fit on the training set only (to avoid data leakage).
@@ -234,7 +234,7 @@ features with `StandardScaler` fit on the training set only (to avoid data leaka
   for scikit-learn, which caused numerical overflow warnings during model training in Step 14. Fixed by
   chaining `.astype(int)` onto the one-hot encoding step so the whole feature matrix is uniformly numeric.
 
-### ✅ Step 13: Handle Class Imbalance with SMOTE *(done)*
+### Step 13: Handle Class Imbalance with SMOTE *(done)*
 Apply SMOTE oversampling to the **training set only** so the model sees enough churn examples to learn
 from, while the test set keeps the real-world ~26.6% churn proportion for fair evaluation.
 
@@ -243,7 +243,7 @@ from, while the test set keeps the real-world ~26.6% churn proportion for fair e
 - After SMOTE: both classes balanced to 4,130 each (synthetic churn examples generated, not real customers)
 - `X_test`/`y_test` were left untouched, still reflecting the real ~26.6% churn rate for fair evaluation in Step 16
 
-### ✅ Step 14: Train Model 1 — Logistic Regression *(done)*
+### Step 14: Train Model 1 — Logistic Regression *(done)*
 An interpretable baseline model — its coefficients translate directly into churn odds, easy to explain
 to a business audience.
 
@@ -255,7 +255,7 @@ to a business audience.
   probabilities all within a valid [0.001, 0.999] range, converged in ~68 iterations (well under the
   `max_iter=1000` cap) — confirms the Step 12 dtype fix and the RuntimeWarning suppression below are safe
 
-### ✅ Step 15: Train Model 2 — Random Forest *(done)*
+### Step 15: Train Model 2 — Random Forest *(done)*
 A model that captures non-linear relationships and feature interactions, generally stronger in
 practice; used to see whether the added complexity is worth it over the linear baseline.
 
@@ -265,7 +265,7 @@ practice; used to see whether the added complexity is worth it over the linear b
 - No warnings during training (unlike Logistic Regression) — tree-based models aren't affected by the linear-optimizer numerical issues from Step 14
 - Both models' predictions now ready for a rigorous side-by-side comparison in Step 16
 
-### ✅ Step 16: Model Evaluation & Comparison *(done)*
+### Step 16: Model Evaluation & Comparison *(done)*
 Evaluate both models on the untouched (non-SMOTE) test set using confusion matrix, precision/recall/F1
 (for the churn class specifically), and ROC-AUC — accuracy alone is misleading on imbalanced data.
 
@@ -297,7 +297,7 @@ two sub-steps check whether it can be trusted.
   score vs. ~58% validation score at every training size tested, with no gap-closing as data grows — a
   model-complexity overfitting signature that a different split ratio would not fix.
 
-### ✅ Step 17: Feature Importance & Interpretation *(done)*
+### Step 17: Feature Importance & Interpretation *(done)*
 Extract Logistic Regression coefficients and Random Forest `feature_importances_`, and cross-check them
 against the statistical findings from Steps 5-6 (Chi-square/Mann-Whitney) for agreement or conflict.
 
@@ -307,7 +307,7 @@ against the statistical findings from Steps 5-6 (Chi-square/Mann-Whitney) for ag
 - **Conflict found:** `InternetService_Fiber optic` has a *negative* Logistic Regression coefficient (-5.21), implying it reduces churn — directly contradicting the Step 5 finding that Fiber optic has the highest churn rate (41.9%). Root cause confirmed: Fiber optic customers pay far more on average (91.50 vs. 58.09 for DSL vs. 21.08 for no internet), a 0.79 correlation with `MonthlyCharges`, causing the two correlated features to split credit for the same effect in ways that distort each individual coefficient
 - **Second conflict:** `gender_Male` lands in Random Forest's top 10 despite Step 5's Chi-square test finding no significant relationship with churn — a reminder that Random Forest always assigns nonzero importance to every feature, so its rankings alone can overstate a weak/non-existent effect and should be checked against a significance test
 
-### ✅ Step 18: ML Summary & Final Business Recommendations *(done)*
+### Step 18: ML Summary & Final Business Recommendations *(done)*
 Tie the ML results together with the EDA findings into one coherent set of business recommendations,
 noting limitations (SMOTE uses synthetic data; results are still correlational, not causal).
 
@@ -324,8 +324,28 @@ robustness checks were added afterward in Steps 16.4-16.5).
 > The full plan with the rationale behind each step is available at
 > `/Users/athens/.claude/plans/insight-data-toasty-blum.md`
 
-## Current Status
+## Status
 
-**All 18 steps complete.** Both notebooks (`telco_churn_eda.ipynb`, `telco_churn_modeling.ipynb`) run
-end-to-end with no errors or warnings. See Step 18 above for the final findings and business
-recommendations.
+- [x] Stage 1 — Data loading & cleaning (Steps 1-2: `TotalCharges` fixed from string to numeric, 11
+      zero-tenure rows dropped after verifying the cause)
+- [x] Stage 2 — Exploratory data analysis (Steps 3-11: 14/16 categorical features significant via
+      Chi-square, all 3 numeric features significant via Mann-Whitney U — high-risk segment defined as
+      month-to-month + fiber + <12mo tenure + no security/support = 73.5% churn, 29% of all churn)
+- [x] Stage 3 — Feature engineering for ML (Step 12: one-hot encoding with `drop_first=True`, stratified
+      80/20 split, `StandardScaler` fit on train only — fixed a `bool`-dtype overflow bug along the way)
+- [x] Stage 4 — Class imbalance handling with SMOTE (Step 13: training set balanced to 4,130/4,130; test
+      set left untouched at the real 26.6% churn rate for fair evaluation)
+- [x] Stage 5 — Model training (Steps 14-15: Logistic Regression and Random Forest, both trained on the
+      SMOTE-balanced training set)
+- [x] Stage 6 — Model evaluation & robustness checks (Step 16: Logistic Regression wins on recall/ROC-AUC,
+      73.8% vs 65.5% — confirmed stable via 5-fold Stratified Cross-Validation and confirmed the 80/20
+      split has enough training data via learning curve, Steps 16.4-16.5)
+- [x] Stage 7 — Feature importance & cross-checking (Step 17: `Contract`, `OnlineSecurity`/`TechSupport`,
+      `MonthlyCharges` confirmed as churn drivers by EDA statistics and both models; 2 conflicts found and
+      diagnosed via multicollinearity)
+- [x] Stage 8 — Business summary & recommendations (Step 18: 5 recommendations delivered; limitations
+      documented — correlation ≠ causation, synthetic SMOTE data, no hyperparameter tuning, hand-picked
+      segment thresholds)
+
+Both notebooks (`telco_churn_eda.ipynb`, `telco_churn_modeling.ipynb`) run end-to-end with no errors or
+warnings.
