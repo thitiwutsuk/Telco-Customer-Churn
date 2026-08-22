@@ -1,10 +1,13 @@
 # Telco Customer Churn — EDA & Predictive Modeling
 
-![Python](https://img.shields.io/badge/python-3.9-blue)
-![Pandas](https://img.shields.io/badge/pandas-2.3-150458)
-![scikit--learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Progress](https://img.shields.io/badge/progress-complete%20(18%2F18)-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.9-3776AB?style=flat-square&logo=python&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-2.3-150458?style=flat-square&logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-2.0-013243?style=flat-square&logo=numpy&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E?style=flat-square&logo=scikitlearn&logoColor=white)
+![imbalanced-learn](https://img.shields.io/badge/imbalanced--learn-0.12-9B59B6?style=flat-square)
+![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-F37626?style=flat-square&logo=jupyter&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-3DA639?style=flat-square&logo=opensourceinitiative&logoColor=white)
+![Progress](https://img.shields.io/badge/Progress-Complete%20(18%2F18)-3DA639?style=flat-square)
 
 This project analyzes the **IBM Telco Customer Churn** dataset to find which customer factors are
 associated with churn (customers leaving the service). It starts with a deep Exploratory Data
@@ -280,6 +283,20 @@ Evaluate both models on the untouched (non-SMOTE) test set using confusion matri
 - For a churn problem, missing an actual churner (false negative) is costlier than a false alarm, so **Logistic Regression is the better choice here** despite being the simpler model
 - A concrete case where added model complexity didn't translate into a better outcome for the business objective
 
+**Robustness checks added (Steps 16.4-16.5):** the single 80/20 split above is one random draw — these
+two sub-steps check whether it can be trusted.
+
+- **16.4 — 5-fold Stratified Cross-Validation:** re-trains both models on 5 independent train/test splits.
+  Metric std stays small (≤ ~2 points) across folds, confirming the Step 16 comparison isn't a fluke of one
+  split. The CV-averaged recall gap between the models is actually *wider* (79.6% vs. 59.1%) than the
+  single-split numbers above (73.8% vs. 65.5%) — the robustness check reinforces the Logistic Regression
+  recommendation rather than weakening it.
+- **16.5 — Learning Curve:** checks whether 80% is enough *training* data (a separate question from whether
+  the split is reliable). Logistic Regression's validation recall plateaus by ~3,000 training rows, well
+  before the 5,625 actually used — 80/20 is more than sufficient for it. Random Forest shows ~100% train
+  score vs. ~58% validation score at every training size tested, with no gap-closing as data grows — a
+  model-complexity overfitting signature that a different split ratio would not fix.
+
 ### ✅ Step 17: Feature Importance & Interpretation *(done)*
 Extract Logistic Regression coefficients and Random Forest `feature_importances_`, and cross-check them
 against the statistical findings from Steps 5-6 (Chi-square/Mann-Whitney) for agreement or conflict.
@@ -301,7 +318,8 @@ Logistic Regression coefficients, and Random Forest importances). Delivered 5 bu
 (target the 1-6 month retention window, incentivize long-term contracts, bundle security/support for new
 fiber customers, review the Electronic check payment experience, use the model for proactive customer
 outreach) and documented project-wide limitations (correlation ≠ causation, no time dimension, synthetic
-SMOTE data, no hyperparameter tuning or cross-validation, hand-picked segment thresholds).
+SMOTE data, no hyperparameter tuning, hand-picked segment thresholds — cross-validation and learning-curve
+robustness checks were added afterward in Steps 16.4-16.5).
 
 > The full plan with the rationale behind each step is available at
 > `/Users/athens/.claude/plans/insight-data-toasty-blum.md`
