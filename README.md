@@ -6,6 +6,7 @@
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.6-F7931E?style=flat-square&logo=scikitlearn&logoColor=white)
 ![imbalanced-learn](https://img.shields.io/badge/imbalanced--learn-0.12-9B59B6?style=flat-square)
 ![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-F37626?style=flat-square&logo=jupyter&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.50-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-3DA639?style=flat-square&logo=opensourceinitiative&logoColor=white)
 ![Progress](https://img.shields.io/badge/Progress-Complete%20(18%2F18)-3DA639?style=flat-square)
 
@@ -29,10 +30,14 @@ findings with two classification models (Logistic Regression, Random Forest).
 Telco Customer Churn/
 ├── data/
 │   ├── raw/WA_Fn-UseC_-Telco-Customer-Churn.csv   # Original dataset, never modified
-│   └── processed/telco_churn_clean.csv            # Output of the EDA notebook, input to the modeling notebook
+│   └── processed/telco_churn_clean.csv            # Output of the EDA notebook, input to the modeling notebook and the app
 ├── notebooks/
 │   ├── telco_churn_eda.ipynb                      # Steps 1-11: cleaning + EDA
 │   └── telco_churn_modeling.ipynb                 # Steps 12-18: feature engineering + ML
+├── app/                                           # Streamlit dashboard (see "Interactive App" below)
+│   ├── Home.py                                    # Problem statement + key results
+│   ├── pages/                                     # EDA, model results, and live churn predictor
+│   └── src/                                       # Shared data loading + model training
 ├── requirements.txt
 ├── LICENSE
 └── README.md
@@ -61,6 +66,16 @@ CSV the EDA notebook produces):
 cd notebooks
 jupyter nbconvert --to notebook --execute --inplace telco_churn_eda.ipynb
 jupyter nbconvert --to notebook --execute --inplace telco_churn_modeling.ipynb
+```
+
+## Interactive App
+
+A Streamlit dashboard covering the whole project — problem statement, interactive EDA, model
+comparison (with the 16.4/16.5 robustness checks), and a live churn predictor. Requires
+`data/processed/telco_churn_clean.csv` to exist (run the EDA notebook first, above).
+
+```bash
+streamlit run app/Home.py
 ```
 
 ## Methodology
@@ -112,5 +127,6 @@ jupyter nbconvert --to notebook --execute --inplace telco_churn_modeling.ipynb
 - [x] Stage 6 — Model evaluation & robustness checks (Step 16, incl. 16.4-16.5)
 - [x] Stage 7 — Feature importance & cross-checking (Step 17)
 - [x] Stage 8 — Business summary & recommendations (Step 18)
+- [x] Stage 9 — Interactive Streamlit app (problem statement, EDA, model results, live churn predictor)
 
-Both notebooks run end-to-end with no errors or warnings.
+Both notebooks and the Streamlit app run end-to-end with no errors or warnings.
