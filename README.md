@@ -35,8 +35,7 @@ Telco Customer Churn/
 │   ├── telco_churn_eda.ipynb                      # Steps 1-11: cleaning + EDA
 │   └── telco_churn_modeling.ipynb                 # Steps 12-18: feature engineering + ML
 ├── app/                                           # Streamlit dashboard (see "Interactive App" below)
-│   ├── Home.py                                    # Problem statement + key results
-│   ├── pages/                                     # EDA, model results, and live churn predictor
+│   ├── Home.py                                    # Single-page app: Problem Statement / EDA / Model Results / Predictor tabs
 │   └── src/                                       # Shared data loading + model training
 ├── requirements.txt
 ├── LICENSE
