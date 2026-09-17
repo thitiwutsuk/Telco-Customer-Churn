@@ -100,7 +100,7 @@ with tab_eda:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        fig, ax = plt.subplots(figsize=(7, 4))
+        fig, ax = plt.subplots(figsize=(5, 3))
         sns.barplot(x=rate_by_cat.index, y=rate_by_cat.values, ax=ax, color="#4C72B0")
         ax.axhline(df["Churn_numeric"].mean() * 100, linestyle="--", color="gray", label="Base rate (26.6%)")
         ax.set_ylabel("Churn rate (%)")
@@ -126,7 +126,7 @@ with tab_eda:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        fig, ax = plt.subplots(figsize=(7, 4))
+        fig, ax = plt.subplots(figsize=(5, 3))
         sns.boxplot(data=df, x="Churn", y=num_choice, order=["No", "Yes"], hue="Churn",
                     palette=["#55A868", "#C44E52"], legend=False, ax=ax)
         st.pyplot(fig)
@@ -139,26 +139,27 @@ with tab_eda:
     st.divider()
 
     st.subheader("Correlation between numeric features")
-    fig, ax = plt.subplots(figsize=(5, 4))
-    sns.heatmap(df[NUMERIC_COLS + ["Churn_numeric"]].corr(), annot=True, fmt=".2f", cmap="coolwarm", ax=ax, vmin=-1, vmax=1)
-    st.pyplot(fig)
-    st.caption(
-        "`tenure` and `TotalCharges` correlate strongly (0.83) since `TotalCharges` accumulates over "
-        "`tenure` — a multicollinearity note carried into the ML modeling phase (Step 7)."
-    )
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        fig, ax = plt.subplots(figsize=(4, 3))
+        sns.heatmap(df[NUMERIC_COLS + ["Churn_numeric"]].corr(), annot=True, fmt=".2f", cmap="coolwarm", ax=ax, vmin=-1, vmax=1)
+        st.pyplot(fig)
+    st.caption("`tenure`↔`TotalCharges` correlate strongly (0.83) — a multicollinearity note for the ML phase.")
 
     st.divider()
 
     st.subheader("Retention curve — churn rate by tenure")
     tenure_bins = pd.cut(df["tenure"], bins=range(0, 79, 6), right=False)
     retention = df.groupby(tenure_bins, observed=True)["Churn_numeric"].mean() * 100
-    fig, ax = plt.subplots(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(6, 3))
     ax.plot([str(i.left) + "-" + str(i.right - 1) for i in retention.index], retention.values, marker="o", color="#C44E52")
     ax.set_ylabel("Churn rate (%)")
     ax.set_xlabel("Tenure (months)")
     plt.xticks(rotation=45, ha="right")
-    st.pyplot(fig)
-    st.caption("Churn peaks in the first months and declines steadily — months 1-6 are the critical retention window (Step 9).")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.pyplot(fig)
+    st.caption("Churn peaks early — months 1-6 are the critical retention window (Step 9).")
 
     st.divider()
 
@@ -191,11 +192,7 @@ with tab_models:
 
     st.subheader("Metric comparison")
     st.dataframe(results["metrics_df"].style.format("{:.3f}").highlight_max(axis=0, color="#d4edda"))
-    st.markdown(
-        "**Random Forest** wins on Accuracy/Precision (fewer false alarms). **Logistic Regression** wins "
-        "on Recall/ROC-AUC (catches more actual churners) — the costlier error to avoid in a churn problem "
-        "is missing a real churner, so **Logistic Regression is the recommended model**."
-    )
+    st.caption("Logistic Regression wins on Recall/ROC-AUC (catches more churners) — the recommended model.")
 
     st.divider()
 
@@ -203,34 +200,34 @@ with tab_models:
     cols = st.columns(2)
     for col, (name, cm) in zip(cols, results["confusion_matrices"].items()):
         with col:
-            fig, ax = plt.subplots(figsize=(4, 3.5))
-            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax,
+            fig, ax = plt.subplots(figsize=(3, 2.6))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax, annot_kws={"size": 8},
                         xticklabels=["No churn", "Churn"], yticklabels=["No churn", "Churn"])
-            ax.set_title(name)
-            ax.set_xlabel("Predicted")
-            ax.set_ylabel("Actual")
+            ax.set_title(name, fontsize=9)
+            ax.set_xlabel("Predicted", fontsize=8)
+            ax.set_ylabel("Actual", fontsize=8)
+            ax.tick_params(labelsize=7)
             st.pyplot(fig)
 
     st.divider()
 
     st.subheader("ROC curve")
-    fig, ax = plt.subplots(figsize=(6, 5))
-    for name, color in [("Logistic Regression", "#4C72B0"), ("Random Forest", "#55A868")]:
-        fpr, tpr, auc_score = results["roc_data"][name]
-        ax.plot(fpr, tpr, label=f"{name} (AUC = {auc_score:.3f})", color=color, linewidth=2)
-    ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Random guess (AUC = 0.5)")
-    ax.set_xlabel("False Positive Rate")
-    ax.set_ylabel("True Positive Rate")
-    ax.legend()
-    st.pyplot(fig)
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        fig, ax = plt.subplots(figsize=(4, 3.3))
+        for name, color in [("Logistic Regression", "#4C72B0"), ("Random Forest", "#55A868")]:
+            fpr, tpr, auc_score = results["roc_data"][name]
+            ax.plot(fpr, tpr, label=f"{name} (AUC={auc_score:.3f})", color=color, linewidth=2)
+        ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Random guess")
+        ax.set_xlabel("False Positive Rate", fontsize=8)
+        ax.set_ylabel("True Positive Rate", fontsize=8)
+        ax.legend(fontsize=7)
+        st.pyplot(fig)
 
     st.divider()
 
     with st.expander("Robustness checks — 5-fold Cross-Validation & Learning Curve (Steps 16.4-16.5)"):
-        st.markdown(
-            "The comparison above uses a single 80/20 split. These checks confirm it wasn't a fluke and "
-            "that the training data is sufficient."
-        )
+        st.caption("Confirms the 80/20 split result above wasn't a fluke.")
         robustness = get_robustness_results(df)
 
         st.markdown("**5-fold Stratified Cross-Validation**")
@@ -243,28 +240,24 @@ with tab_models:
                 row[f"{metric} (std)"] = vals.std()
             cv_summary.append(row)
         st.dataframe(pd.DataFrame(cv_summary).set_index("Model").round(3))
-        st.caption(
-            "Std stays small (≤ ~2 points) across folds — the Recall gap between the models is actually "
-            "*wider* on average than the single-split numbers above, reinforcing the Logistic Regression pick."
-        )
+        st.caption("Std stays small — the Logistic Regression Recall advantage holds up across folds.")
 
         st.markdown("**Learning Curve (Recall)**")
-        fig, axes = plt.subplots(1, 2, figsize=(11, 4), sharey=True)
+        fig, axes = plt.subplots(1, 2, figsize=(7, 2.6), sharey=True)
         for ax, (name, color) in zip(axes, [("Logistic Regression", "#4C72B0"), ("Random Forest", "#55A868")]):
             sizes, train_scores, val_scores = robustness["learning_curve_results"][name]
-            ax.plot(sizes, train_scores.mean(axis=1), "o--", color=color, alpha=0.5, label="Train")
-            ax.plot(sizes, val_scores.mean(axis=1), "o-", color=color, label="Validation")
+            ax.plot(sizes, train_scores.mean(axis=1), "o--", color=color, alpha=0.5, label="Train", markersize=3)
+            ax.plot(sizes, val_scores.mean(axis=1), "o-", color=color, label="Validation", markersize=3)
             ax.axvline(x=len(df) * 0.8, linestyle=":", color="gray")
-            ax.set_title(name)
-            ax.set_xlabel("Training samples")
-            ax.legend(fontsize=8)
-        axes[0].set_ylabel("Recall (churn)")
-        st.pyplot(fig)
-        st.caption(
-            "Logistic Regression's validation recall plateaus well before the current 80% training size "
-            "(dotted line). Random Forest's ~100% train score vs. ~58% validation score at every size is a "
-            "model-complexity overfitting signature, not a data-size problem."
-        )
+            ax.set_title(name, fontsize=9)
+            ax.set_xlabel("Training samples", fontsize=8)
+            ax.tick_params(labelsize=7)
+            ax.legend(fontsize=6)
+        axes[0].set_ylabel("Recall (churn)", fontsize=8)
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.pyplot(fig)
+        st.caption("Logistic Regression plateaus early; Random Forest's gap is overfitting, not a data-size issue.")
 
     st.divider()
 
@@ -274,25 +267,24 @@ with tab_models:
     with col1:
         st.markdown("**Logistic Regression — coefficients**")
         top_coef = results["coef_df"].head(top_n).iloc[::-1]
-        fig, ax = plt.subplots(figsize=(6, top_n * 0.35 + 1))
+        fig, ax = plt.subplots(figsize=(4, top_n * 0.28 + 0.6))
         colors = ["#C44E52" if c > 0 else "#4C72B0" for c in top_coef["coefficient"]]
         ax.barh(top_coef["feature"], top_coef["coefficient"], color=colors)
-        ax.set_xlabel("Coefficient (red = increases churn odds)")
+        ax.set_xlabel("Coefficient", fontsize=8)
+        ax.tick_params(labelsize=7)
         st.pyplot(fig)
     with col2:
         st.markdown("**Random Forest — feature importances**")
         top_imp = results["importance_df"].head(top_n).iloc[::-1]
-        fig, ax = plt.subplots(figsize=(6, top_n * 0.35 + 1))
+        fig, ax = plt.subplots(figsize=(4, top_n * 0.28 + 0.6))
         ax.barh(top_imp["feature"], top_imp["importance"], color="#55A868")
-        ax.set_xlabel("Importance")
+        ax.set_xlabel("Importance", fontsize=8)
+        ax.tick_params(labelsize=7)
         st.pyplot(fig)
 
     st.caption(
-        "`Contract`, `OnlineSecurity`/`TechSupport`, and `MonthlyCharges` are confirmed as churn drivers by "
-        "both models and by the EDA statistical tests. `InternetService_Fiber optic` has a *negative* "
-        "Logistic Regression coefficient despite having the highest raw churn rate in EDA — a multicollinearity "
-        "artifact with `MonthlyCharges` (diagnosed in Step 17.3), not a sign Fiber optic actually protects "
-        "against churn."
+        "`Contract`, `OnlineSecurity`/`TechSupport`, `MonthlyCharges` confirmed as drivers by both models. "
+        "Fiber optic's negative coefficient is a multicollinearity artifact (Step 17.3), not a real effect."
     )
 
 # ---------------------------------------------------------------------------
