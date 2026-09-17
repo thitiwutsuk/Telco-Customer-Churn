@@ -139,12 +139,14 @@ with tab_eda:
     st.divider()
 
     st.subheader("Correlation between numeric features")
-    col1, col2 = st.columns([1, 1])
-    with col1:
+    col1, col2, col3 = st.columns([1, 2, 1.2])
+    with col2:
         fig, ax = plt.subplots(figsize=(4, 3))
         sns.heatmap(df[NUMERIC_COLS + ["Churn_numeric"]].corr(), annot=True, fmt=".2f", cmap="coolwarm", ax=ax, vmin=-1, vmax=1)
         st.pyplot(fig)
-    st.caption("`tenure`↔`TotalCharges` correlate strongly (0.83) — a multicollinearity note for the ML phase.")
+    with col3:
+        st.markdown("")
+        st.caption("`tenure`↔`TotalCharges` correlate strongly (0.83) — a multicollinearity note for the ML phase.")
 
     st.divider()
 
@@ -156,9 +158,12 @@ with tab_eda:
     ax.set_ylabel("Churn rate (%)")
     ax.set_xlabel("Tenure (months)")
     plt.xticks(rotation=45, ha="right")
-    col1, col2 = st.columns([2, 1])
-    with col1:
+    col1, col2, col3 = st.columns([1, 2, 1.2])
+    with col2:
         st.pyplot(fig)
+    with col3:
+        st.markdown("")
+        st.caption("Churn peaks early — months 1-6 are the critical retention window (Step 9).")
     st.caption("Churn peaks early — months 1-6 are the critical retention window (Step 9).")
 
     st.divider()
