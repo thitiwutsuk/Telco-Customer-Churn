@@ -107,16 +107,32 @@ probability, so retention efforts can be targeted at the customers most likely t
 # Tab 2: Exploratory Data Analysis
 # ---------------------------------------------------------------------------
 with tab_eda:
-    st.caption("Follows Steps 1-10 of `notebooks/telco_churn_eda.ipynb` — each step shows what was done and what it found.")
+    st.caption("Follows Steps 1-10 of `notebooks/telco_churn_eda.ipynb` — each step explains what was done, why, "
+               "how to read the result, and what it found.")
 
     base_rate = df["Churn_numeric"].mean() * 100
 
-    def finding(text):
-        st.success(f"**Finding:** {text}")
+    def explain(what, why):
+        st.markdown(f"**What we did:** {what}")
+        st.markdown(f"**Why:** {why}")
+
+    def how_to_read(text):
+        st.markdown("**How to read it**")
+        st.caption(text)
+
+    def finding(text, so_what):
+        st.success(f"**Finding:** {text}\n\n**So what:** {so_what}")
 
     # --- Step 1: Data cleaning ------------------------------------------------
     st.subheader("Step 1 — Load & clean the data")
-    st.markdown("Checked every column's type and missing values, then fixed anything that would break the analysis.")
+    explain(
+        "Loaded the raw CSV, checked each column's data type and missing values, converted `TotalCharges` from "
+        "text to numbers, investigated the rows that failed to convert, and standardized `SeniorCitizen` from 0/1 "
+        "to No/Yes.",
+        "Every later step depends on the data being correct. A number stored as text can't be averaged or tested, "
+        "and deleting rows without knowing why they're broken can quietly bias the results — so the cause is "
+        "investigated before anything is removed.",
+    )
 
     raw = load_raw_data()
     raw_total = pd.to_numeric(raw["TotalCharges"], errors="coerce")
@@ -126,21 +142,28 @@ with tab_eda:
     c2.metric("Rows with blank TotalCharges", f"{len(blank_rows):,}")
     c3.metric("Rows after cleaning", f"{len(df):,}")
     finding(
-        f"`isnull()` reported no missing values, but `TotalCharges` was stored as text. Converting it to numeric "
-        f"exposed {len(blank_rows)} blank rows — all with tenure = {', '.join(map(str, blank_rows['tenure'].unique()))} "
-        "(brand-new customers not yet billed), so they were dropped. `SeniorCitizen` was also mapped from 0/1 to "
-        "No/Yes to match the other columns."
+        f"`isnull()` reported no missing values, but `TotalCharges` was stored as text because blanks were saved "
+        f"as a space. Converting it to numeric exposed {len(blank_rows)} blank rows — all with tenure = "
+        f"{', '.join(map(str, blank_rows['tenure'].unique()))}, i.e. brand-new customers who haven't been billed yet.",
+        f"The blanks are explained, not errors, and they're only {len(blank_rows) / len(raw):.2%} of the data, so "
+        "dropping them is safe. These customers also haven't had a chance to churn yet, so keeping them would add "
+        "noise.",
     )
 
     st.divider()
 
     # --- Step 2: Target distribution -----------------------------------------
     st.subheader("Step 2 — How many customers churn?")
-    st.markdown("Looked at the target variable `Churn` on its own before comparing it with anything else.")
+    explain(
+        "Counted how many customers churned (`Churn = Yes`) versus stayed.",
+        "This gives the base rate — the company-wide average every group is compared against. A group is only "
+        "\"high risk\" if it churns noticeably more than this. It also shows whether the classes are balanced, "
+        "which decides how the model must be trained and evaluated.",
+    )
 
+    churn_counts = df["Churn"].value_counts().reindex(["No", "Yes"])
     col1, col2 = st.columns([2, 1])
     with col1:
-        churn_counts = df["Churn"].value_counts().reindex(["No", "Yes"])
         fig, ax = plt.subplots(figsize=(5, 3))
         ax.bar(churn_counts.index, churn_counts.values, color=["#55A868", "#C44E52"])
         for i, v in enumerate(churn_counts.values):
@@ -149,17 +172,26 @@ with tab_eda:
         ax.set_xlabel("Churn")
         st.pyplot(fig)
     with col2:
-        finding(
-            f"{base_rate:.1f}% of customers churned ({churn_counts['Yes']:,} of {len(df):,}). This is the base rate "
-            "every group is compared against — and the classes are imbalanced (~1 in 4), which the modeling "
-            "phase handles with SMOTE."
-        )
+        how_to_read("Each bar is the number of customers in that group; the label shows the count and its share of "
+                    "all customers.")
+    finding(
+        f"{base_rate:.1f}% of customers churned ({churn_counts['Yes']:,} of {len(df):,}) — roughly 1 in 4.",
+        "The data is imbalanced. A model that always predicts \"No churn\" would already be ~73% accurate while "
+        "catching nobody, so accuracy is misleading here. The modeling phase uses SMOTE to balance the training "
+        "data and focuses on recall instead.",
+    )
 
     st.divider()
 
     # --- Step 3: Categorical features vs churn -------------------------------
     st.subheader("Step 3 — Which customer attributes relate to churn?")
-    st.markdown("Ran a Chi-square test for every categorical feature against `Churn`, then compared churn rates per category.")
+    explain(
+        "Ran a Chi-square test of independence for each of the 16 categorical features against `Churn`, then "
+        "compared the churn rate of every category.",
+        "A difference in churn rate between two groups could just be random noise. The Chi-square test checks "
+        "whether the difference is large enough to be real: a p-value below 0.05 means there's less than a 5% "
+        "chance of seeing a gap this big if the feature had no relationship with churn.",
+    )
 
     chi2_rows = []
     for col in CATEGORICAL_COLS:
@@ -176,12 +208,16 @@ with tab_eda:
     with col1:
         st.dataframe(chi2_df.style.format({"p-value": "{:.2e}"}), hide_index=True, height=250)
     with col2:
-        finding(
-            f"{int(chi2_df['Significant'].sum())} of {len(chi2_df)} features are significant (p < 0.05); "
-            f"only {' and '.join(f'`{c}`' for c in not_significant)} are not. `{chi2_df.loc[0, 'Feature']}` is the strongest. "
-            f"Highest-churn categories: {top_rate('Contract')}, {top_rate('InternetService')}, "
-            f"{top_rate('PaymentMethod')}."
-        )
+        how_to_read("Features are sorted from strongest to weakest relationship with churn. A higher Chi-square and "
+                    "a smaller p-value mean a stronger relationship; `Significant` is True when p < 0.05.")
+    finding(
+        f"{int(chi2_df['Significant'].sum())} of {len(chi2_df)} features are significantly related to churn; only "
+        f"{' and '.join(f'`{c}`' for c in not_significant)} are not. `{chi2_df.loc[0, 'Feature']}` is the strongest. "
+        f"Highest-churn categories: {top_rate('Contract')}, {top_rate('InternetService')}, "
+        f"{top_rate('PaymentMethod')}.",
+        "Churn is driven by how customers are contracted and served, not by who they are — gender makes no "
+        "difference. Contract type, internet service and payment method are the levers worth looking at first.",
+    )
 
     cat_choice = st.selectbox("Explore a feature", CATEGORICAL_COLS, index=CATEGORICAL_COLS.index("Contract"))
     rate_by_cat = df.groupby(cat_choice, observed=True)["Churn_numeric"].mean().sort_values(ascending=False) * 100
@@ -199,6 +235,8 @@ with tab_eda:
         plt.xticks(rotation=30, ha="right")
         st.pyplot(fig)
     with col2:
+        how_to_read("Each bar is the share of customers in that category who churned. Bars above the dashed line "
+                    "churn more than the company average.")
         st.markdown(f"**Chi-square p-value:** `{p_value:.4g}` — "
                     + ("significant" if p_value < 0.05 else "not significant"))
         st.dataframe(
@@ -209,8 +247,13 @@ with tab_eda:
 
     # --- Step 4: Numeric features vs churn -----------------------------------
     st.subheader("Step 4 — Do churners differ on tenure and charges?")
-    st.markdown("Compared the distribution of each numeric feature between churned and retained customers "
-                "with a Mann-Whitney U test (used because the data is skewed, not normally distributed).")
+    explain(
+        "Compared `tenure`, `MonthlyCharges` and `TotalCharges` between churned and retained customers using "
+        "medians and a Mann-Whitney U test.",
+        "These features are skewed (many new customers, long tails), so the mean would be pulled by extreme "
+        "values. The median and the Mann-Whitney U test don't assume a normal distribution, so they give a fairer "
+        "comparison.",
+    )
 
     medians = df.groupby("Churn")[NUMERIC_COLS].median()
     num_choice = st.selectbox("Numeric feature", NUMERIC_COLS, index=NUMERIC_COLS.index("tenure"))
@@ -225,6 +268,8 @@ with tab_eda:
                     palette=["#55A868", "#C44E52"], legend=False, ax=ax)
         st.pyplot(fig)
     with col2:
+        how_to_read("The line inside each box is the median; the box covers the middle 50% of customers. Boxes "
+                    "that sit at different heights mean the two groups differ.")
         st.markdown(f"**Mann-Whitney U p-value:** `{mw_p:.4g}` — " + ("significant" if mw_p < 0.05 else "not significant"))
         st.metric("Median — churned", f"{churned.median():,.2f}")
         st.metric("Median — retained", f"{retained.median():,.2f}")
@@ -232,14 +277,21 @@ with tab_eda:
     finding(
         f"All 3 numeric features differ significantly. Churners are much newer (median tenure "
         f"{medians.loc['Yes', 'tenure']:.0f} vs {medians.loc['No', 'tenure']:.0f} months) and pay more per month "
-        f"(median {medians.loc['Yes', 'MonthlyCharges']:.2f} vs {medians.loc['No', 'MonthlyCharges']:.2f})."
+        f"(median {medians.loc['Yes', 'MonthlyCharges']:.2f} vs {medians.loc['No', 'MonthlyCharges']:.2f}).",
+        "The typical churner is a newer customer on a more expensive plan. Churners have lower `TotalCharges` only "
+        "because they leave earlier — not because they spend less per month.",
     )
 
     st.divider()
 
     # --- Step 5: Correlation -------------------------------------------------
     st.subheader("Step 5 — Are the numeric features related to each other?")
-    st.markdown("Checked the correlation matrix of the numeric features (plus churn) to spot redundant features.")
+    explain(
+        "Calculated the correlation between every pair of numeric features, plus churn.",
+        "If two features carry the same information, a model can't tell which one really matters, and its "
+        "coefficients become unreliable (multicollinearity). This check is done before modeling so the results "
+        "can be interpreted correctly later.",
+    )
 
     corr = df[NUMERIC_COLS + ["Churn_numeric"]].corr()
     col1, col2 = st.columns([2, 1])
@@ -248,37 +300,52 @@ with tab_eda:
         sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax, vmin=-1, vmax=1)
         st.pyplot(fig)
     with col2:
-        finding(
-            f"`tenure` and `TotalCharges` are strongly correlated (r = {corr.loc['tenure', 'TotalCharges']:.2f}), "
-            "since total charges ≈ monthly charges × tenure. Flagged as multicollinearity for the ML phase — it "
-            "makes Logistic Regression coefficients harder to interpret."
-        )
+        how_to_read("Values range from -1 to 1. Close to 1 (red) means the two rise together, close to -1 (blue) "
+                    "means one rises as the other falls, and close to 0 means no linear relationship.")
+    finding(
+        f"`tenure` and `TotalCharges` are strongly correlated (r = {corr.loc['tenure', 'TotalCharges']:.2f}), since "
+        f"total charges ≈ monthly charges × tenure. `tenure` is negatively related to churn "
+        f"(r = {corr.loc['tenure', 'Churn_numeric']:.2f}).",
+        "Both features are kept, but their model coefficients must be read with care — the effect of tenure gets "
+        "split between the two. This explains why `tenure` ranks lower in Logistic Regression than in the EDA.",
+    )
 
     st.divider()
 
     # --- Step 6: Interaction -------------------------------------------------
     st.subheader("Step 6 — What happens when risk factors combine?")
-    st.markdown("Cross-tabulated churn rate by `Contract` × `InternetService`, the two strongest categorical drivers.")
+    explain(
+        "Built a pivot table of churn rate by `Contract` × `InternetService`, the two strongest drivers from Step 3.",
+        "Step 3 looked at one feature at a time. Real customers have several traits at once, and two risk factors "
+        "together can be far worse than either one alone.",
+    )
 
     interaction = df.pivot_table(index="Contract", columns="InternetService", values="Churn_numeric", aggfunc="mean") * 100
+    low = interaction.stack().idxmin()
     col1, col2 = st.columns([2, 1])
     with col1:
         fig, ax = plt.subplots(figsize=(5, 3))
         sns.heatmap(interaction, annot=True, fmt=".1f", cmap="Reds", ax=ax)
         st.pyplot(fig)
     with col2:
-        low = interaction.stack().idxmin()
-        finding(
-            f"Month-to-month + Fiber optic churns at {interaction.loc['Month-to-month', 'Fiber optic']:.1f}%, "
-            f"versus {interaction.stack().min():.1f}% for {low[0]} + {'no internet' if low[1] == 'No' else low[1]}. "
-            "Risk factors stack on top of each other."
-        )
+        how_to_read("Each cell is the churn rate (%) of customers with that contract and internet service. Darker "
+                    "red means higher churn.")
+    finding(
+        f"Month-to-month + Fiber optic churns at {interaction.loc['Month-to-month', 'Fiber optic']:.1f}%, versus "
+        f"{interaction.stack().min():.1f}% for {low[0]} + {'no internet' if low[1] == 'No' else low[1]}.",
+        "Risk factors stack. Fiber optic customers on longer contracts churn far less, so offering them a longer "
+        "contract is a natural retention lever (this is an association, not proof of cause).",
+    )
 
     st.divider()
 
     # --- Step 7: Retention curve ---------------------------------------------
     st.subheader("Step 7 — When in the customer lifetime does churn happen?")
-    st.markdown("Plotted churn rate by tenure (grouped into 6-month bands) to find the critical retention window.")
+    explain(
+        "Plotted churn rate against tenure, grouped into 6-month bands.",
+        "Knowing when customers leave tells the business when to act. Retention offers work best if they arrive "
+        "before the peak risk period, not after.",
+    )
 
     tenure_bins = pd.cut(df["tenure"], bins=range(0, 79, 6), right=False)
     retention = df.groupby(tenure_bins, observed=True)["Churn_numeric"].mean() * 100
@@ -294,18 +361,25 @@ with tab_eda:
         plt.xticks(rotation=45, ha="right")
         st.pyplot(fig)
     with col2:
-        finding(
-            f"Churn peaks at month {by_month.idxmax()} ({by_month.max():.1f}%) and falls steadily after that. "
-            f"The first band ({retention.index[0].left}-{retention.index[0].right - 1} months) averages "
-            f"{retention.iloc[0]:.1f}% churn — the critical window for retention outreach."
-        )
+        how_to_read("Each point is the churn rate of customers in that tenure band. Points above the dashed line "
+                    "churn more than the company average.")
+    finding(
+        f"Churn peaks at month {by_month.idxmax()} ({by_month.max():.1f}%) and falls steadily after that. The first "
+        f"band ({retention.index[0].left}-{retention.index[0].right - 1} months) averages {retention.iloc[0]:.1f}% churn.",
+        "The first months are the critical retention window. Onboarding and early check-ins matter more than "
+        "loyalty rewards for long-term customers, who rarely leave anyway.",
+    )
 
     st.divider()
 
     # --- Step 8: Risk segment ------------------------------------------------
     st.subheader("Step 8 — Define the highest-risk segment")
-    st.markdown("Combined the findings from Steps 3-7 into one rule-based segment: month-to-month contract + "
-                "Fiber optic + tenure < 12 months + no OnlineSecurity + no TechSupport.")
+    explain(
+        "Combined the strongest findings from Steps 3-7 into one rule: month-to-month contract + Fiber optic + "
+        "tenure < 12 months + no OnlineSecurity + no TechSupport.",
+        "Individual findings are hard to act on. A clearly defined segment gives the business a concrete list of "
+        "customers to target, and lets us measure how much of the churn problem it covers.",
+    )
 
     risk_mask = (
         (df["Contract"] == "Month-to-month")
@@ -323,8 +397,10 @@ with tab_eda:
     c2.metric("Segment churn rate", f"{segment_rate:.1%}")
     c3.metric("Share of all churn", f"{churn_share:.1%}")
     finding(
-        f"Just {segment_share:.1%} of customers churn at {segment_rate:.1%} — about {segment_rate * 100 / base_rate:.1f}× "
-        f"the base rate — and account for {churn_share:.1%} of all churn. A small, high-leverage group to target first."
+        f"Just {segment_share:.1%} of customers churn at {segment_rate:.1%} — about "
+        f"{segment_rate * 100 / base_rate:.1f}× the base rate — and account for {churn_share:.1%} of all churn.",
+        "Focusing retention effort on about 1 in 10 customers addresses nearly a third of all churn. Bundling "
+        "security/support add-ons and offering longer contracts to this group are the natural first actions.",
     )
 
 # ---------------------------------------------------------------------------
