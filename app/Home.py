@@ -8,7 +8,7 @@ import streamlit as st
 from scipy.stats import chi2_contingency, mannwhitneyu
 
 sys.path.append(str(Path(__file__).resolve().parent))
-from src.data import CATEGORICAL_COLS, NUMERIC_COLS, load_clean_data  # noqa: E402
+from src.data import CATEGORICAL_COLS, NUMERIC_COLS, load_clean_data, load_raw_data  # noqa: E402
 from src.model import CV_SCORING, get_evaluation_results, get_production_pipeline, get_robustness_results  # noqa: E402
 
 st.set_page_config(page_title="Telco Customer Churn", page_icon="📉", layout="wide")
@@ -78,6 +78,11 @@ probability, so retention efforts can be targeted at the customers most likely t
 - **Features:** demographics, account/billing information, and subscribed services
 """
     )
+
+    st.markdown("**Raw data sample (first 10 rows)**")
+    st.dataframe(load_raw_data().head(10), hide_index=True)
+    st.caption("As loaded from `data/raw/` before any cleaning — e.g. `SeniorCitizen` is still 0/1 and "
+               "`TotalCharges` is still stored as text.")
 
     st.info("Use the tabs above to explore the EDA findings, compare model results, or try the live churn predictor.")
 

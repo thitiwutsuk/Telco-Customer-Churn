@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+RAW_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "raw" / "WA_Fn-UseC_-Telco-Customer-Churn.csv"
 DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "processed" / "telco_churn_clean.csv"
 
 CATEGORICAL_COLS = [
@@ -33,3 +34,9 @@ def load_clean_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH, index_col="customerID")
     df["Churn_numeric"] = (df["Churn"] == "Yes").astype(int)
     return df
+
+
+@st.cache_data(show_spinner="Loading raw dataset...")
+def load_raw_data() -> pd.DataFrame:
+    """The original, uncleaned CSV — used only to show what the source data looks like."""
+    return pd.read_csv(RAW_DATA_PATH)
