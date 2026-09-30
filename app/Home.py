@@ -27,8 +27,11 @@ tab_problem, tab_eda, tab_models, tab_predict = st.tabs(
 # ---------------------------------------------------------------------------
 with tab_problem:
     n_customers = len(df)
+    n_churned = int(df["Churn_numeric"].sum())
     churn_rate = df["Churn_numeric"].mean()
 
+    # 1. Problem -> 2. Data -> 3. Approach -> 4. Results -> where to go next
+    st.subheader("1. The Problem")
     st.markdown(
         """
 A telecom company is losing customers (**churn**) at a meaningful rate, but doesn't know **who**
@@ -44,32 +47,12 @@ probability, so retention efforts can be targeted at the customers most likely t
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Customers analyzed", f"{n_customers:,}")
-    col2.metric("Base churn rate", f"{churn_rate:.1%}")
-    col3.metric(
-        "At risk (highest-risk segment)", "73.5%",
-        help="Month-to-month + Fiber optic + tenure < 12 months + no security/support add-ons",
-    )
+    col2.metric("Customers who churned", f"{n_churned:,}")
+    col3.metric("Base churn rate", f"{churn_rate:.1%}", help="Roughly 1 in 4 customers left the service.")
 
     st.divider()
 
-    st.subheader("Key Results")
-    r1, r2, r3 = st.columns(3)
-    with r1:
-        st.markdown("**Best model: Logistic Regression**")
-        st.markdown("73.8% recall, 0.827 ROC-AUC on the churn class — beats Random Forest (65.5% recall) "
-                    "on the metric that matters most: catching customers who will actually churn.")
-    with r2:
-        st.markdown("**Confirmed churn drivers**")
-        st.markdown("`Contract` type, `OnlineSecurity`/`TechSupport` subscription, and `MonthlyCharges` — "
-                    "agreed on by statistical tests (Chi-square / Mann-Whitney) and both ML models.")
-    with r3:
-        st.markdown("**Actionable segment found**")
-        st.markdown("10.5% of customers carry a 73.5% churn rate and account for 29% of all churn — "
-                    "a small, high-leverage group for retention outreach.")
-
-    st.divider()
-
-    st.subheader("Dataset")
+    st.subheader("2. The Data")
     st.markdown(
         """
 - **Source:** IBM Sample Data Sets (also distributed on Kaggle as *Telco Customer Churn*)
@@ -84,7 +67,42 @@ probability, so retention efforts can be targeted at the customers most likely t
     st.caption("As loaded from `data/raw/` before any cleaning — e.g. `SeniorCitizen` is still 0/1 and "
                "`TotalCharges` is still stored as text.")
 
-    st.info("Use the tabs above to explore the EDA findings, compare model results, or try the live churn predictor.")
+    st.divider()
+
+    st.subheader("3. The Approach")
+    a1, a2, a3, a4 = st.columns(4)
+    with a1:
+        st.markdown("**Clean**")
+        st.markdown("Convert `TotalCharges` to numeric; drop 11 blank rows (all brand-new customers, tenure = 0).")
+    with a2:
+        st.markdown("**Explore**")
+        st.markdown("Test every feature against churn (Chi-square / Mann-Whitney) and define a high-risk segment.")
+    with a3:
+        st.markdown("**Model**")
+        st.markdown("Train Logistic Regression and Random Forest on SMOTE-balanced data; validate with 5-fold CV.")
+    with a4:
+        st.markdown("**Predict**")
+        st.markdown("Score any customer's churn probability with the selected model.")
+
+    st.divider()
+
+    st.subheader("4. Key Results")
+    r1, r2, r3 = st.columns(3)
+    with r1:
+        st.markdown("**Why they churn — confirmed drivers**")
+        st.markdown("`Contract` type, `OnlineSecurity`/`TechSupport` subscription, and `MonthlyCharges` — "
+                    "agreed on by statistical tests (Chi-square / Mann-Whitney) and both ML models.")
+    with r2:
+        st.markdown("**Who churns — highest-risk segment**")
+        st.markdown("Month-to-month + Fiber optic + tenure < 12 months + no security/support add-ons: "
+                    "10.5% of customers, 73.5% churn rate, 29% of all churn.")
+    with r3:
+        st.markdown("**Predicting it — Logistic Regression**")
+        st.markdown("73.8% recall, 0.827 ROC-AUC on the churn class — beats Random Forest (65.5% recall) "
+                    "on the metric that matters most: catching customers who will actually churn.")
+
+    st.info("Next: **Exploratory Data Analysis** for the evidence behind these findings, **Model Results** "
+            "for the model comparison, or **Churn Predictor** to score a customer yourself.")
 
 # ---------------------------------------------------------------------------
 # Tab 2: Exploratory Data Analysis
