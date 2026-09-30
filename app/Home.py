@@ -33,92 +33,182 @@ def finding(text, so_what):
 
 df = load_clean_data()
 
-st.title("Telco Customer Churn")
+st.title("Customer Churn Analysis")
 
 tab_problem, tab_eda, tab_models, tab_predict = st.tabs(
-    ["Problem Statement", "Exploratory Data Analysis", "Model Results", "Churn Predictor"]
+    ["Overview", "Exploratory Data Analysis", "Model Results", "Churn Predictor"]
 )
 
 # ---------------------------------------------------------------------------
-# Tab 1: Problem Statement
+# Tab 1: Overview (problem statement, executive summary, recommendations)
 # ---------------------------------------------------------------------------
 with tab_problem:
     n_customers = len(df)
-    n_churned = int(df["Churn_numeric"].sum())
-    churn_rate = df["Churn_numeric"].mean()
+    churned = df[df["Churn_numeric"] == 1]
+    n_churned = len(churned)
+    churn_rate = n_churned / n_customers
+    lost_billing = churned["MonthlyCharges"].sum()
+    lost_share = lost_billing / df["MonthlyCharges"].sum()
+    early_share = (churned["tenure"] <= 12).mean()
+    mtm_share = (churned["Contract"] == "Month-to-month").mean()
 
-    st.subheader("The Problem")
+    risk_mask = (
+        (df["Contract"] == "Month-to-month")
+        & (df["InternetService"] == "Fiber optic")
+        & (df["tenure"] < 12)
+        & (df["OnlineSecurity"] == "No")
+        & (df["TechSupport"] == "No")
+    )
+    segment_share = risk_mask.mean()
+    segment_rate = df.loc[risk_mask, "Churn_numeric"].mean()
+    segment_churn_share = df.loc[risk_mask, "Churn_numeric"].sum() / n_churned
+
+    lr_metrics = get_evaluation_results(df)["metrics_df"].loc["Logistic Regression"]
+
+    st.caption(f"Internal report · Prepared for the management team · Based on a snapshot of {n_customers:,} "
+               "active and former customer accounts")
+
+    # --- Problem statement ---------------------------------------------------
+    st.header("Problem Statement")
     st.markdown(
-        """
-A telecom company is losing customers (**churn**) at a meaningful rate, but doesn't know **who**
-is likely to leave or **why**. Acquiring a new customer costs far more than retaining an existing
-one — without knowing which customers are at risk, retention spend is a guess instead of a
-targeted decision.
+        f"""
+**{churn_rate:.1%} of our customers have cancelled their service** — roughly 1 in 4. Together, the customers
+we lost were billing **{lost_billing:,.0f} per month**, equal to **{lost_share:.1%} of our total monthly
+charges**.
 
-**Project goal:** use the company's own customer records to (1) find which customer attributes are
-statistically associated with churn, and (2) build a model that scores each customer's churn
-probability, so retention efforts can be targeted at the customers most likely to leave.
+Our retention activity today is not targeted. We have no systematic way to tell which customers are about
+to leave or why, so retention offers are either sent too broadly — spending budget on customers who would
+have stayed — or reach at-risk customers too late. Since winning a new customer costs considerably more than
+keeping an existing one, every avoidable cancellation is a direct loss.
 """
     )
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Customers analyzed", f"{n_customers:,}")
-    col2.metric("Customers who churned", f"{n_churned:,}")
-    col3.metric("Base churn rate", f"{churn_rate:.1%}", help="Roughly 1 in 4 customers left the service.")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Customers in scope", f"{n_customers:,}")
+    c2.metric("Customers lost", f"{n_churned:,}")
+    c3.metric("Churn rate", f"{churn_rate:.1%}")
+    c4.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Questions this report answers**")
+        st.markdown(
+            """
+1. **Who** is leaving?
+2. **Why** are they leaving?
+3. **When** in the customer lifetime does it happen?
+4. **Can we identify** at-risk customers before they leave?
+"""
+        )
+    with col2:
+        st.markdown("**Objective**")
+        st.markdown(
+            "Give the retention team a clear, evidence-based view of churn drivers and a risk score for every "
+            "customer, so retention budget goes to the customers most likely to leave."
+        )
+        st.markdown("**Success criteria**")
+        st.markdown(
+            "The model must catch the majority of customers who actually leave — missing a churner costs more "
+            "than contacting a customer who would have stayed."
+        )
 
     st.divider()
 
-    st.subheader("The Data")
-    st.markdown(
-        """
-- **Source:** IBM Sample Data Sets (also distributed on Kaggle as *Telco Customer Churn*)
-- **Size:** 7,043 customers × 21 columns (7,032 × 20 after cleaning)
-- **Target:** `Churn` (Yes/No) — whether the customer left the service
-- **Features:** demographics, account/billing information, and subscribed services
-"""
+    # --- Executive summary ---------------------------------------------------
+    st.header("Executive Summary")
+    s1, s2, s3, s4 = st.columns(4)
+    with s1:
+        st.markdown("**Who is leaving**")
+        st.markdown(
+            f"A clearly defined segment — month-to-month, Fiber optic, under 12 months, no security or support "
+            f"add-ons — is only **{segment_share:.1%}** of customers but churns at **{segment_rate:.1%}** and "
+            f"accounts for **{segment_churn_share:.1%}** of all churn."
+        )
+    with s2:
+        st.markdown("**Why they leave**")
+        st.markdown(
+            "Churn is driven by how customers are contracted and served, not by who they are. Contract type, "
+            "lack of OnlineSecurity/TechSupport and higher monthly charges are confirmed by both statistical "
+            "tests and the models. Gender has no effect."
+        )
+    with s3:
+        st.markdown("**When it happens**")
+        st.markdown(
+            f"Early. **{early_share:.0%}** of the customers we lost left within their first 12 months, and "
+            f"**{mtm_share:.0%}** were on month-to-month contracts. Risk falls sharply after the first year."
+        )
+    with s4:
+        st.markdown("**Can we predict it**")
+        st.markdown(
+            f"Yes. The selected model catches **{lr_metrics['Recall (churn)']:.1%}** of customers who actually "
+            f"leave (ROC-AUC {lr_metrics['ROC-AUC']:.3f}), and the result held up under 5-fold cross-validation."
+        )
+
+    st.divider()
+
+    # --- Recommendations -----------------------------------------------------
+    st.header("Recommendations")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                ["1", "Proactive onboarding programme for the first 6 months",
+                 "All new customers", "Churn is highest in the first months of the relationship"],
+                ["2", "Incentives to move from month-to-month to 1- or 2-year contracts",
+                 "Month-to-month customers", "Contract type is the strongest single driver of churn"],
+                ["3", "Bundle OnlineSecurity / TechSupport for new Fiber optic customers",
+                 "Fiber optic customers without add-ons", "Customers with these add-ons churn far less"],
+                ["4", "Review the Electronic check payment experience",
+                 "Electronic check payers", "This payment method has the highest churn rate"],
+                ["5", "Use the model's risk score to prioritise retention outreach",
+                 "Customers scored as high risk", "Focuses budget where it prevents the most churn"],
+            ],
+            columns=["Priority", "Action", "Target group", "Evidence"],
+        ),
+        hide_index=True,
+        width="stretch",
     )
 
-    st.markdown("**Raw data sample (first 10 rows)**")
-    st.dataframe(load_raw_data().head(10), hide_index=True)
-    st.caption("As loaded from `data/raw/` before any cleaning — e.g. `SeniorCitizen` is still 0/1 and "
-               "`TotalCharges` is still stored as text.")
-
     st.divider()
 
-    st.subheader("The Approach")
-    a1, a2, a3, a4 = st.columns(4)
-    with a1:
-        st.markdown("**Clean**")
-        st.markdown("Convert `TotalCharges` to numeric; drop 11 blank rows (all brand-new customers, tenure = 0).")
-    with a2:
-        st.markdown("**Explore**")
-        st.markdown("Test every feature against churn (Chi-square / Mann-Whitney) and define a high-risk segment.")
-    with a3:
-        st.markdown("**Model**")
-        st.markdown("Train Logistic Regression and Random Forest on SMOTE-balanced data; validate with 5-fold CV.")
-    with a4:
-        st.markdown("**Predict**")
-        st.markdown("Score any customer's churn probability with the selected model.")
+    # --- Data & methodology --------------------------------------------------
+    st.header("Data & Methodology")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Data used**")
+        st.markdown(
+            """
+- Customer account snapshot: 7,043 accounts × 21 fields (public IBM *Telco Customer Churn* sample)
+- 7,032 accounts after cleaning — 11 brand-new accounts with no billing history removed
+- Fields cover demographics, contract and billing, and subscribed services
+- Outcome tracked: `Churn` — whether the customer cancelled
+"""
+        )
+    with col2:
+        st.markdown("**How the analysis was done**")
+        st.markdown(
+            """
+1. **Clean** — fixed data types and investigated missing values before removing anything
+2. **Explore** — tested every field against churn and identified the highest-risk segment
+3. **Model** — compared Logistic Regression and Random Forest, validated with 5-fold cross-validation
+4. **Score** — deployed the selected model so any customer can be scored
+"""
+        )
 
-    st.divider()
+    with st.expander("View a sample of the raw data (first 10 rows)"):
+        st.dataframe(load_raw_data().head(10), hide_index=True)
+        st.caption("As received, before cleaning — e.g. `SeniorCitizen` is still 0/1 and `TotalCharges` is "
+                   "still stored as text.")
 
-    st.subheader("Key Results")
-    r1, r2, r3 = st.columns(3)
-    with r1:
-        st.markdown("**Why they churn — confirmed drivers**")
-        st.markdown("`Contract` type, `OnlineSecurity`/`TechSupport` subscription, and `MonthlyCharges` — "
-                    "agreed on by statistical tests (Chi-square / Mann-Whitney) and both ML models.")
-    with r2:
-        st.markdown("**Who churns — highest-risk segment**")
-        st.markdown("Month-to-month + Fiber optic + tenure < 12 months + no security/support add-ons: "
-                    "10.5% of customers, 73.5% churn rate, 29% of all churn.")
-    with r3:
-        st.markdown("**Predicting it — Logistic Regression**")
-        st.markdown("73.8% recall, 0.827 ROC-AUC on the churn class — beats Random Forest (65.5% recall) "
-                    "on the metric that matters most: catching customers who will actually churn.")
+    st.markdown("**Limitations**")
+    st.caption(
+        "Findings show association, not proven cause. The data is a single snapshot, so trends over calendar "
+        "time cannot be measured. Model thresholds and the risk segment were set by judgement and should be "
+        "refined with retention-cost data before rollout."
+    )
 
-    st.info("Next: **Exploratory Data Analysis** for the evidence behind these findings, **Model Results** "
-            "for the model comparison, or **Churn Predictor** to score a customer yourself.")
+    st.info("The following tabs contain the supporting detail: **Exploratory Data Analysis** (evidence behind "
+            "each finding), **Model Results** (model selection and validation) and **Churn Predictor** (score an "
+            "individual customer).")
 
 # ---------------------------------------------------------------------------
 # Tab 2: Exploratory Data Analysis
