@@ -30,8 +30,7 @@ with tab_problem:
     n_churned = int(df["Churn_numeric"].sum())
     churn_rate = df["Churn_numeric"].mean()
 
-    # 1. Problem -> 2. Data -> 3. Approach -> 4. Results -> where to go next
-    st.subheader("1. The Problem")
+    st.subheader("The Problem")
     st.markdown(
         """
 A telecom company is losing customers (**churn**) at a meaningful rate, but doesn't know **who**
@@ -52,7 +51,7 @@ probability, so retention efforts can be targeted at the customers most likely t
 
     st.divider()
 
-    st.subheader("2. The Data")
+    st.subheader("The Data")
     st.markdown(
         """
 - **Source:** IBM Sample Data Sets (also distributed on Kaggle as *Telco Customer Churn*)
@@ -69,7 +68,7 @@ probability, so retention efforts can be targeted at the customers most likely t
 
     st.divider()
 
-    st.subheader("3. The Approach")
+    st.subheader("The Approach")
     a1, a2, a3, a4 = st.columns(4)
     with a1:
         st.markdown("**Clean**")
@@ -86,7 +85,7 @@ probability, so retention efforts can be targeted at the customers most likely t
 
     st.divider()
 
-    st.subheader("4. Key Results")
+    st.subheader("Key Results")
     r1, r2, r3 = st.columns(3)
     with r1:
         st.markdown("**Why they churn — confirmed drivers**")
@@ -108,44 +107,116 @@ probability, so retention efforts can be targeted at the customers most likely t
 # Tab 2: Exploratory Data Analysis
 # ---------------------------------------------------------------------------
 with tab_eda:
-    st.caption("Mirrors Steps 3-10 of `notebooks/telco_churn_eda.ipynb` — pick a feature below to explore it interactively.")
+    st.caption("Follows Steps 1-10 of `notebooks/telco_churn_eda.ipynb` — each step shows what was done and what it found.")
 
-    st.subheader("Churn rate by category")
-    cat_choice = st.selectbox("Categorical feature", CATEGORICAL_COLS, index=CATEGORICAL_COLS.index("Contract"))
+    base_rate = df["Churn_numeric"].mean() * 100
 
-    rate_by_cat = (
-        df.groupby(cat_choice, observed=True)["Churn_numeric"].mean().sort_values(ascending=False) * 100
+    def finding(text):
+        st.success(f"**Finding:** {text}")
+
+    # --- Step 1: Data cleaning ------------------------------------------------
+    st.subheader("Step 1 — Load & clean the data")
+    st.markdown("Checked every column's type and missing values, then fixed anything that would break the analysis.")
+
+    raw = load_raw_data()
+    raw_total = pd.to_numeric(raw["TotalCharges"], errors="coerce")
+    blank_rows = raw[raw_total.isna()]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Raw rows", f"{len(raw):,}")
+    c2.metric("Rows with blank TotalCharges", f"{len(blank_rows):,}")
+    c3.metric("Rows after cleaning", f"{len(df):,}")
+    finding(
+        f"`isnull()` reported no missing values, but `TotalCharges` was stored as text. Converting it to numeric "
+        f"exposed {len(blank_rows)} blank rows — all with tenure = {', '.join(map(str, blank_rows['tenure'].unique()))} "
+        "(brand-new customers not yet billed), so they were dropped. `SeniorCitizen` was also mapped from 0/1 to "
+        "No/Yes to match the other columns."
     )
-    count_by_cat = df.groupby(cat_choice, observed=True).size()
 
-    contingency = pd.crosstab(df[cat_choice], df["Churn"])
-    chi2, p_value, _, _ = chi2_contingency(contingency)
+    st.divider()
+
+    # --- Step 2: Target distribution -----------------------------------------
+    st.subheader("Step 2 — How many customers churn?")
+    st.markdown("Looked at the target variable `Churn` on its own before comparing it with anything else.")
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        churn_counts = df["Churn"].value_counts().reindex(["No", "Yes"])
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.bar(churn_counts.index, churn_counts.values, color=["#55A868", "#C44E52"])
+        for i, v in enumerate(churn_counts.values):
+            ax.text(i, v, f"{v:,} ({v / len(df):.1%})", ha="center", va="bottom")
+        ax.set_ylabel("Customers")
+        ax.set_xlabel("Churn")
+        st.pyplot(fig)
+    with col2:
+        finding(
+            f"{base_rate:.1f}% of customers churned ({churn_counts['Yes']:,} of {len(df):,}). This is the base rate "
+            "every group is compared against — and the classes are imbalanced (~1 in 4), which the modeling "
+            "phase handles with SMOTE."
+        )
+
+    st.divider()
+
+    # --- Step 3: Categorical features vs churn -------------------------------
+    st.subheader("Step 3 — Which customer attributes relate to churn?")
+    st.markdown("Ran a Chi-square test for every categorical feature against `Churn`, then compared churn rates per category.")
+
+    chi2_rows = []
+    for col in CATEGORICAL_COLS:
+        chi2, p, _, _ = chi2_contingency(pd.crosstab(df[col], df["Churn"]))
+        chi2_rows.append({"Feature": col, "Chi-square": round(chi2, 1), "p-value": p, "Significant": p < 0.05})
+    chi2_df = pd.DataFrame(chi2_rows).sort_values("p-value").reset_index(drop=True)
+    not_significant = chi2_df.loc[~chi2_df["Significant"], "Feature"].tolist()
+
+    def top_rate(col):
+        rates = df.groupby(col, observed=True)["Churn_numeric"].mean() * 100
+        return f"{rates.idxmax()} ({rates.max():.1f}%)"
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.dataframe(chi2_df.style.format({"p-value": "{:.2e}"}), hide_index=True, height=250)
+    with col2:
+        finding(
+            f"{int(chi2_df['Significant'].sum())} of {len(chi2_df)} features are significant (p < 0.05); "
+            f"only {' and '.join(f'`{c}`' for c in not_significant)} are not. `{chi2_df.loc[0, 'Feature']}` is the strongest. "
+            f"Highest-churn categories: {top_rate('Contract')}, {top_rate('InternetService')}, "
+            f"{top_rate('PaymentMethod')}."
+        )
+
+    cat_choice = st.selectbox("Explore a feature", CATEGORICAL_COLS, index=CATEGORICAL_COLS.index("Contract"))
+    rate_by_cat = df.groupby(cat_choice, observed=True)["Churn_numeric"].mean().sort_values(ascending=False) * 100
+    count_by_cat = df.groupby(cat_choice, observed=True).size()
+    p_value = chi2_df.set_index("Feature").loc[cat_choice, "p-value"]
 
     col1, col2 = st.columns([2, 1])
     with col1:
         fig, ax = plt.subplots(figsize=(5, 3))
         sns.barplot(x=rate_by_cat.index, y=rate_by_cat.values, ax=ax, color="#4C72B0")
-        ax.axhline(df["Churn_numeric"].mean() * 100, linestyle="--", color="gray", label="Base rate (26.6%)")
+        ax.axhline(base_rate, linestyle="--", color="gray", label=f"Base rate ({base_rate:.1f}%)")
         ax.set_ylabel("Churn rate (%)")
         ax.set_xlabel(cat_choice)
         ax.legend()
         plt.xticks(rotation=30, ha="right")
         st.pyplot(fig)
     with col2:
-        st.markdown(f"**Chi-square test:** p = `{p_value:.4g}`")
-        st.markdown("Statistically significant (p < 0.05)" if p_value < 0.05 else "Not statistically significant")
+        st.markdown(f"**Chi-square p-value:** `{p_value:.4g}` — "
+                    + ("significant" if p_value < 0.05 else "not significant"))
         st.dataframe(
             pd.DataFrame({"Churn rate": rate_by_cat.round(1).astype(str) + "%", "n": count_by_cat[rate_by_cat.index]})
         )
 
     st.divider()
 
-    st.subheader("Numeric features vs. churn")
-    num_choice = st.selectbox("Numeric feature", NUMERIC_COLS, index=NUMERIC_COLS.index("tenure"))
+    # --- Step 4: Numeric features vs churn -----------------------------------
+    st.subheader("Step 4 — Do churners differ on tenure and charges?")
+    st.markdown("Compared the distribution of each numeric feature between churned and retained customers "
+                "with a Mann-Whitney U test (used because the data is skewed, not normally distributed).")
 
+    medians = df.groupby("Churn")[NUMERIC_COLS].median()
+    num_choice = st.selectbox("Numeric feature", NUMERIC_COLS, index=NUMERIC_COLS.index("tenure"))
     churned = df.loc[df["Churn"] == "Yes", num_choice]
     retained = df.loc[df["Churn"] == "No", num_choice]
-    u_stat, mw_p = mannwhitneyu(churned, retained)
+    _, mw_p = mannwhitneyu(churned, retained)
 
     col1, col2 = st.columns([2, 1])
     with col1:
@@ -154,44 +225,88 @@ with tab_eda:
                     palette=["#55A868", "#C44E52"], legend=False, ax=ax)
         st.pyplot(fig)
     with col2:
-        st.markdown(f"**Mann-Whitney U test:** p = `{mw_p:.4g}`")
-        st.markdown("Statistically significant (p < 0.05)" if mw_p < 0.05 else "Not statistically significant")
+        st.markdown(f"**Mann-Whitney U p-value:** `{mw_p:.4g}` — " + ("significant" if mw_p < 0.05 else "not significant"))
         st.metric("Median — churned", f"{churned.median():,.2f}")
         st.metric("Median — retained", f"{retained.median():,.2f}")
 
+    finding(
+        f"All 3 numeric features differ significantly. Churners are much newer (median tenure "
+        f"{medians.loc['Yes', 'tenure']:.0f} vs {medians.loc['No', 'tenure']:.0f} months) and pay more per month "
+        f"(median {medians.loc['Yes', 'MonthlyCharges']:.2f} vs {medians.loc['No', 'MonthlyCharges']:.2f})."
+    )
+
     st.divider()
 
-    st.subheader("Correlation between numeric features")
-    col1, col2, col3 = st.columns([1, 2, 1.2])
-    with col2:
-        fig, ax = plt.subplots(figsize=(4, 3))
-        sns.heatmap(df[NUMERIC_COLS + ["Churn_numeric"]].corr(), annot=True, fmt=".2f", cmap="coolwarm", ax=ax, vmin=-1, vmax=1)
+    # --- Step 5: Correlation -------------------------------------------------
+    st.subheader("Step 5 — Are the numeric features related to each other?")
+    st.markdown("Checked the correlation matrix of the numeric features (plus churn) to spot redundant features.")
+
+    corr = df[NUMERIC_COLS + ["Churn_numeric"]].corr()
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax, vmin=-1, vmax=1)
         st.pyplot(fig)
-    with col3:
-        st.markdown("")
-        st.caption("`tenure`↔`TotalCharges` correlate strongly (0.83) — a multicollinearity note for the ML phase.")
+    with col2:
+        finding(
+            f"`tenure` and `TotalCharges` are strongly correlated (r = {corr.loc['tenure', 'TotalCharges']:.2f}), "
+            "since total charges ≈ monthly charges × tenure. Flagged as multicollinearity for the ML phase — it "
+            "makes Logistic Regression coefficients harder to interpret."
+        )
 
     st.divider()
 
-    st.subheader("Retention curve — churn rate by tenure")
+    # --- Step 6: Interaction -------------------------------------------------
+    st.subheader("Step 6 — What happens when risk factors combine?")
+    st.markdown("Cross-tabulated churn rate by `Contract` × `InternetService`, the two strongest categorical drivers.")
+
+    interaction = df.pivot_table(index="Contract", columns="InternetService", values="Churn_numeric", aggfunc="mean") * 100
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        sns.heatmap(interaction, annot=True, fmt=".1f", cmap="Reds", ax=ax)
+        st.pyplot(fig)
+    with col2:
+        low = interaction.stack().idxmin()
+        finding(
+            f"Month-to-month + Fiber optic churns at {interaction.loc['Month-to-month', 'Fiber optic']:.1f}%, "
+            f"versus {interaction.stack().min():.1f}% for {low[0]} + {'no internet' if low[1] == 'No' else low[1]}. "
+            "Risk factors stack on top of each other."
+        )
+
+    st.divider()
+
+    # --- Step 7: Retention curve ---------------------------------------------
+    st.subheader("Step 7 — When in the customer lifetime does churn happen?")
+    st.markdown("Plotted churn rate by tenure (grouped into 6-month bands) to find the critical retention window.")
+
     tenure_bins = pd.cut(df["tenure"], bins=range(0, 79, 6), right=False)
     retention = df.groupby(tenure_bins, observed=True)["Churn_numeric"].mean() * 100
-    fig, ax = plt.subplots(figsize=(6, 3))
-    ax.plot([str(i.left) + "-" + str(i.right - 1) for i in retention.index], retention.values, marker="o", color="#C44E52")
-    ax.set_ylabel("Churn rate (%)")
-    ax.set_xlabel("Tenure (months)")
-    plt.xticks(rotation=45, ha="right")
-    col1, col2, col3 = st.columns([1, 2, 1.2])
-    with col2:
+    by_month = df.groupby("tenure")["Churn_numeric"].mean() * 100
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        fig, ax = plt.subplots(figsize=(5, 3))
+        ax.plot([f"{i.left}-{i.right - 1}" for i in retention.index], retention.values, marker="o", color="#C44E52")
+        ax.axhline(base_rate, linestyle="--", color="gray", label=f"Base rate ({base_rate:.1f}%)")
+        ax.set_ylabel("Churn rate (%)")
+        ax.set_xlabel("Tenure (months)")
+        ax.legend()
+        plt.xticks(rotation=45, ha="right")
         st.pyplot(fig)
-    with col3:
-        st.markdown("")
-        st.caption("Churn peaks early — months 1-6 are the critical retention window (Step 9).")
-    st.caption("Churn peaks early — months 1-6 are the critical retention window (Step 9).")
+    with col2:
+        finding(
+            f"Churn peaks at month {by_month.idxmax()} ({by_month.max():.1f}%) and falls steadily after that. "
+            f"The first band ({retention.index[0].left}-{retention.index[0].right - 1} months) averages "
+            f"{retention.iloc[0]:.1f}% churn — the critical window for retention outreach."
+        )
 
     st.divider()
 
-    st.subheader("Highest-risk segment (Step 10)")
+    # --- Step 8: Risk segment ------------------------------------------------
+    st.subheader("Step 8 — Define the highest-risk segment")
+    st.markdown("Combined the findings from Steps 3-7 into one rule-based segment: month-to-month contract + "
+                "Fiber optic + tenure < 12 months + no OnlineSecurity + no TechSupport.")
+
     risk_mask = (
         (df["Contract"] == "Month-to-month")
         & (df["InternetService"] == "Fiber optic")
@@ -200,11 +315,17 @@ with tab_eda:
         & (df["TechSupport"] == "No")
     )
     risk_segment = df[risk_mask]
+    segment_share = len(risk_segment) / len(df)
+    segment_rate = risk_segment["Churn_numeric"].mean()
+    churn_share = risk_segment["Churn_numeric"].sum() / df["Churn_numeric"].sum()
     c1, c2, c3 = st.columns(3)
-    c1.metric("Segment size", f"{len(risk_segment):,} ({len(risk_segment) / len(df):.1%} of customers)")
-    c2.metric("Segment churn rate", f"{risk_segment['Churn_numeric'].mean():.1%}")
-    c3.metric("Share of all churn", f"{risk_segment['Churn_numeric'].sum() / df['Churn_numeric'].sum():.1%}")
-    st.caption("Defined as: month-to-month contract + Fiber optic + tenure < 12 months + no OnlineSecurity + no TechSupport.")
+    c1.metric("Segment size", f"{len(risk_segment):,} ({segment_share:.1%} of customers)")
+    c2.metric("Segment churn rate", f"{segment_rate:.1%}")
+    c3.metric("Share of all churn", f"{churn_share:.1%}")
+    finding(
+        f"Just {segment_share:.1%} of customers churn at {segment_rate:.1%} — about {segment_rate * 100 / base_rate:.1f}× "
+        f"the base rate — and account for {churn_share:.1%} of all churn. A small, high-leverage group to target first."
+    )
 
 # ---------------------------------------------------------------------------
 # Tab 3: Model Results
