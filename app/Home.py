@@ -14,6 +14,23 @@ from src.model import CV_SCORING, get_evaluation_results, get_production_pipelin
 st.set_page_config(page_title="Telco Customer Churn", page_icon="📉", layout="wide")
 sns.set_style("whitegrid")
 
+
+
+# Shared layout for every analysis step: Approach / Rationale, a chart with reading notes, then a Key finding box
+def explain(what, why):
+    st.markdown(f"**Approach:** {what}")
+    st.markdown(f"**Rationale:** {why}")
+
+
+def how_to_read(text):
+    st.markdown("**Reading the chart**")
+    st.caption(text)
+
+
+def finding(text, so_what):
+    st.success(f"**Key finding:** {text}\n\n**Business implication:** {so_what}")
+
+
 df = load_clean_data()
 
 st.title("Telco Customer Churn")
@@ -111,17 +128,6 @@ with tab_eda:
                "how to read the result, and what it found.")
 
     base_rate = df["Churn_numeric"].mean() * 100
-
-    def explain(what, why):
-        st.markdown(f"**Approach:** {what}")
-        st.markdown(f"**Rationale:** {why}")
-
-    def how_to_read(text):
-        st.markdown("**Reading the chart**")
-        st.caption(text)
-
-    def finding(text, so_what):
-        st.success(f"**Key finding:** {text}\n\n**Business implication:** {so_what}")
 
     # --- Step 1: Data cleaning ------------------------------------------------
     st.subheader("Step 1 — Load & clean the data")
@@ -408,22 +414,101 @@ with tab_eda:
 # ---------------------------------------------------------------------------
 with tab_models:
     results = get_evaluation_results(df)
+    robustness = get_robustness_results(df)
 
-    st.caption(
-        f"Logistic Regression vs. Random Forest, evaluated on a held-out test set "
-        f"({results['n_test']:,} customers, {results['n_churn_test']:,} of whom actually churned) — "
-        "mirrors Step 16 of `notebooks/telco_churn_modeling.ipynb`."
+    st.caption("Follows Steps 12-17 of `notebooks/telco_churn_modeling.ipynb` — each step explains what was done, "
+               "why, how to read the result, and what it found.")
+
+    metrics = results["metrics_df"]
+    lr, rf = metrics.loc["Logistic Regression"], metrics.loc["Random Forest"]
+    n_test, n_churn_test = results["n_test"], results["n_churn_test"]
+    n_train = len(df) - n_test
+    n_churn_train = int(df["Churn_numeric"].sum()) - n_churn_test
+
+    # --- Step 1: Feature preparation -----------------------------------------
+    st.subheader("Step 1 — Prepare the data for modeling")
+    explain(
+        "Converted `Churn` to 1/0, one-hot encoded the 16 categorical features (`drop_first=True`), split the data "
+        "80/20 into training and test sets with stratification, and standardized the 3 numeric features using "
+        "statistics from the training set only.",
+        "Models only understand numbers, so categories must be turned into 0/1 columns. The test set is locked "
+        "away to measure performance on customers the model has never seen. Stratifying keeps the churn rate "
+        "identical in both sets, and fitting the scaler on training data only prevents information from the test "
+        "set leaking into training.",
     )
-
-    st.subheader("Metric comparison")
-    st.dataframe(results["metrics_df"].style.format("{:.3f}").highlight_max(axis=0, color="#d4edda"))
-    st.caption("Logistic Regression wins on Recall/ROC-AUC (catches more churners) — the recommended model.")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Model features", f"{len(results['coef_df'])}")
+    c2.metric("Training set", f"{n_train:,} customers")
+    c3.metric("Test set", f"{n_test:,} customers")
+    finding(
+        f"The 16 categorical features became {len(results['coef_df']) - len(NUMERIC_COLS)} one-hot columns, giving "
+        f"{len(results['coef_df'])} features in total. Both sets keep the same churn rate "
+        f"({n_churn_train / n_train:.1%} train, {n_churn_test / n_test:.1%} test).",
+        "The test results below reflect how the model would perform on real, new customers with the same "
+        "churn mix the business actually sees.",
+    )
 
     st.divider()
 
-    st.subheader("Confusion matrices")
-    cols = st.columns(2)
-    for col, (name, cm) in zip(cols, results["confusion_matrices"].items()):
+    # --- Step 2: SMOTE ------------------------------------------------------
+    st.subheader("Step 2 — Balance the training data (SMOTE)")
+    explain(
+        "Applied SMOTE to the training set only, creating synthetic churn examples until both classes were the "
+        "same size. The test set was left untouched.",
+        "With only ~1 in 4 customers churning, a model can score well by mostly predicting \"No churn\" and still "
+        "miss most churners. Balancing the training data forces the model to learn what churners look like. The "
+        "test set stays at the real churn rate so the evaluation stays honest.",
+    )
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Churners before SMOTE", f"{n_churn_train:,}")
+    c2.metric("Non-churners", f"{n_train - n_churn_train:,}")
+    c3.metric("Churners after SMOTE", f"{n_train - n_churn_train:,}")
+    finding(
+        f"The training set went from {n_churn_train:,} churners vs {n_train - n_churn_train:,} non-churners to an "
+        f"even {n_train - n_churn_train:,} / {n_train - n_churn_train:,}.",
+        "The model now pays equal attention to both outcomes. The synthetic examples are not real customers, "
+        "which is a known limitation, so the cross-validation in Step 5 checks the results still hold up.",
+    )
+
+    st.divider()
+
+    # --- Step 3: Metric comparison -----------------------------------------
+    st.subheader("Step 3 — Compare the two models")
+    explain(
+        "Trained Logistic Regression and Random Forest on the balanced training data, then scored both on the "
+        f"held-out test set ({n_test:,} customers, {n_churn_test:,} of whom actually churned).",
+        "Logistic Regression is simple and easy to explain; Random Forest can capture more complex patterns. "
+        "Comparing them shows whether the extra complexity pays off. Because missing a churner costs more than a "
+        "false alarm, Recall is the main metric rather than Accuracy.",
+    )
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.dataframe(metrics.style.format("{:.3f}").highlight_max(axis=0, color="#d4edda"))
+    with col2:
+        how_to_read("Green marks the better model on each metric. Recall = share of actual churners the model "
+                    "caught. Precision = share of flagged customers who really churned. F1 balances the two. "
+                    "ROC-AUC = how well the model ranks churners above non-churners (0.5 = random, 1 = perfect).")
+    finding(
+        f"Logistic Regression catches more churners (Recall {lr['Recall (churn)']:.1%} vs "
+        f"{rf['Recall (churn)']:.1%}) and ranks them better (ROC-AUC {lr['ROC-AUC']:.3f} vs {rf['ROC-AUC']:.3f}). "
+        f"Random Forest has higher Accuracy ({rf['Accuracy']:.1%} vs {lr['Accuracy']:.1%}) and Precision.",
+        "Logistic Regression is the recommended model. A missed churner is lost revenue, while a false alarm only "
+        "costs a retention offer — and the simpler model is also easier to explain to the business.",
+    )
+
+    st.divider()
+
+    # --- Step 4: Confusion matrix + ROC ------------------------------------
+    st.subheader("Step 4 — Where do the models get it right and wrong?")
+    explain(
+        "Broke each model's test predictions into a confusion matrix, and plotted the ROC curve across all "
+        "possible decision thresholds.",
+        "Summary metrics hide the actual counts. The confusion matrix shows exactly how many churners were caught "
+        "or missed, and the ROC curve shows whether one model is better regardless of where the cut-off is set.",
+    )
+    cms = results["confusion_matrices"]
+    cols = st.columns(3)
+    for col, (name, cm) in zip(cols[:2], cms.items()):
         with col:
             fig, ax = plt.subplots(figsize=(3, 2.6))
             sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax, annot_kws={"size": 8},
@@ -433,11 +518,11 @@ with tab_models:
             ax.set_ylabel("Actual", fontsize=8)
             ax.tick_params(labelsize=7)
             st.pyplot(fig)
+    with cols[2]:
+        how_to_read("Rows are what actually happened, columns are what the model predicted. Bottom-right = "
+                    "churners caught; bottom-left = churners missed; top-right = false alarms.")
 
-    st.divider()
-
-    st.subheader("ROC curve")
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([2, 1])
     with col1:
         fig, ax = plt.subplots(figsize=(4, 3.3))
         for name, color in [("Logistic Regression", "#4C72B0"), ("Random Forest", "#55A868")]:
@@ -448,45 +533,101 @@ with tab_models:
         ax.set_ylabel("True Positive Rate", fontsize=8)
         ax.legend(fontsize=7)
         st.pyplot(fig)
+    with col2:
+        how_to_read("Each curve shows the trade-off between catching churners (up) and raising false alarms "
+                    "(right). A curve closer to the top-left corner is better; the dashed line is random guessing.")
+
+    lr_cm, rf_cm = cms["Logistic Regression"], cms["Random Forest"]
+    finding(
+        f"Of {n_churn_test:,} actual churners, Logistic Regression caught {lr_cm[1, 1]:,} and missed {lr_cm[1, 0]:,}; "
+        f"Random Forest caught {rf_cm[1, 1]:,} and missed {rf_cm[1, 0]:,}. Logistic Regression raised more false "
+        f"alarms ({lr_cm[0, 1]:,} vs {rf_cm[0, 1]:,}). Its ROC curve sits slightly above Random Forest's.",
+        f"Choosing Logistic Regression saves {lr_cm[1, 1] - rf_cm[1, 1]:,} more at-risk customers in this test set, "
+        f"at the cost of {lr_cm[0, 1] - rf_cm[0, 1]:,} extra retention contacts to customers who would have stayed.",
+    )
 
     st.divider()
 
-    with st.expander("Robustness checks — 5-fold Cross-Validation & Learning Curve (Steps 16.4-16.5)"):
-        st.caption("Confirms the 80/20 split result above wasn't a fluke.")
-        robustness = get_robustness_results(df)
-
-        st.markdown("**5-fold Stratified Cross-Validation**")
-        cv_summary = []
-        for name, scores in robustness["cv_results"].items():
-            row = {"Model": name}
-            for metric in CV_SCORING:
-                vals = scores[f"test_{metric}"]
-                row[f"{metric} (mean)"] = vals.mean()
-                row[f"{metric} (std)"] = vals.std()
-            cv_summary.append(row)
-        st.dataframe(pd.DataFrame(cv_summary).set_index("Model").round(3))
-        st.caption("Std stays small — the Logistic Regression Recall advantage holds up across folds.")
-
-        st.markdown("**Learning Curve (Recall)**")
-        fig, axes = plt.subplots(1, 2, figsize=(7, 2.6), sharey=True)
-        for ax, (name, color) in zip(axes, [("Logistic Regression", "#4C72B0"), ("Random Forest", "#55A868")]):
-            sizes, train_scores, val_scores = robustness["learning_curve_results"][name]
-            ax.plot(sizes, train_scores.mean(axis=1), "o--", color=color, alpha=0.5, label="Train", markersize=3)
-            ax.plot(sizes, val_scores.mean(axis=1), "o-", color=color, label="Validation", markersize=3)
-            ax.axvline(x=len(df) * 0.8, linestyle=":", color="gray")
-            ax.set_title(name, fontsize=9)
-            ax.set_xlabel("Training samples", fontsize=8)
-            ax.tick_params(labelsize=7)
-            ax.legend(fontsize=6)
-        axes[0].set_ylabel("Recall (churn)", fontsize=8)
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.pyplot(fig)
-        st.caption("Logistic Regression plateaus early; Random Forest's gap is overfitting, not a data-size issue.")
+    # --- Step 5: Cross-validation ------------------------------------------
+    st.subheader("Step 5 — Is the result stable? (5-fold cross-validation)")
+    explain(
+        "Re-ran the full pipeline (scaling → SMOTE → model) with 5-fold stratified cross-validation, so every "
+        "customer is used for testing exactly once.",
+        "The results above come from a single 80/20 split, which could be lucky or unlucky. Cross-validation "
+        "repeats the test 5 times on different splits; a small spread means the result can be trusted.",
+    )
+    cv_summary = []
+    for name, scores in robustness["cv_results"].items():
+        row = {"Model": name}
+        for metric in CV_SCORING:
+            vals = scores[f"test_{metric}"]
+            row[f"{metric} (mean)"] = vals.mean()
+            row[f"{metric} (std)"] = vals.std()
+        cv_summary.append(row)
+    cv_df = pd.DataFrame(cv_summary).set_index("Model")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.dataframe(cv_df.round(3))
+    with col2:
+        how_to_read("\"mean\" is the average score across the 5 folds; \"std\" is how much it varied between "
+                    "folds. A small std means the model performs consistently.")
+    cv_lr, cv_rf = cv_df.loc["Logistic Regression"], cv_df.loc["Random Forest"]
+    finding(
+        f"Logistic Regression averages Recall {cv_lr['recall (mean)']:.3f} ± {cv_lr['recall (std)']:.3f} and "
+        f"ROC-AUC {cv_lr['roc_auc (mean)']:.3f} ± {cv_lr['roc_auc (std)']:.3f}, versus Recall "
+        f"{cv_rf['recall (mean)']:.3f} ± {cv_rf['recall (std)']:.3f} for Random Forest.",
+        "The spread is small and Logistic Regression keeps a wide Recall lead, so the model choice from Step 3 was "
+        "not a fluke of one particular split.",
+    )
 
     st.divider()
 
-    st.subheader("Feature importance (Step 17)")
+    # --- Step 6: Learning curve --------------------------------------------
+    st.subheader("Step 6 — Would more data help? (learning curve)")
+    explain(
+        "Trained each model on increasing amounts of data (10% to 100% of the training folds) and compared the "
+        "Recall on the training data with the Recall on unseen validation data.",
+        "This shows whether the model is limited by the amount of data or by the model itself, and whether it is "
+        "overfitting — memorizing the training data instead of learning patterns that generalize.",
+    )
+    fig, axes = plt.subplots(1, 2, figsize=(7, 2.6), sharey=True)
+    gaps = {}
+    for ax, (name, color) in zip(axes, [("Logistic Regression", "#4C72B0"), ("Random Forest", "#55A868")]):
+        sizes, train_scores, val_scores = robustness["learning_curve_results"][name]
+        train_mean, val_mean = train_scores.mean(axis=1), val_scores.mean(axis=1)
+        gaps[name] = (train_mean[-1], val_mean[-1])
+        ax.plot(sizes, train_mean, "o--", color=color, alpha=0.5, label="Train", markersize=3)
+        ax.plot(sizes, val_mean, "o-", color=color, label="Validation", markersize=3)
+        ax.axvline(x=len(df) * 0.8, linestyle=":", color="gray")
+        ax.set_title(name, fontsize=9)
+        ax.set_xlabel("Training samples", fontsize=8)
+        ax.tick_params(labelsize=7)
+        ax.legend(fontsize=6)
+    axes[0].set_ylabel("Recall (churn)", fontsize=8)
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.pyplot(fig)
+    with col2:
+        how_to_read("Dashed = Recall on data the model trained on; solid = Recall on unseen data. Lines that "
+                    "converge and flatten mean the model has enough data. A large, lasting gap means overfitting.")
+    (lr_train, lr_val), (rf_train, rf_val) = gaps["Logistic Regression"], gaps["Random Forest"]
+    finding(
+        f"Logistic Regression's train and validation Recall converge ({lr_train:.2f} vs {lr_val:.2f}) and flatten "
+        f"out. Random Forest scores {rf_train:.2f} on training data but only {rf_val:.2f} on unseen data.",
+        "The 80/20 split already provides enough training data, so collecting more rows would not change the "
+        "conclusion. Random Forest's weaker Recall comes from overfitting, not from a lack of data.",
+    )
+
+    st.divider()
+
+    # --- Step 7: Feature importance ----------------------------------------
+    st.subheader("Step 7 — Which features drive the predictions?")
+    explain(
+        "Ranked features by the size of their Logistic Regression coefficient and by Random Forest's feature "
+        "importance, then cross-checked both against the EDA statistics.",
+        "A model is only useful to the business if we understand why it flags a customer. Features that the EDA "
+        "and both models agree on are the most reliable drivers to act on.",
+    )
     top_n = st.slider("Show top N features", 5, 20, 10)
     col1, col2 = st.columns(2)
     with col1:
@@ -506,10 +647,18 @@ with tab_models:
         ax.set_xlabel("Importance", fontsize=8)
         ax.tick_params(labelsize=7)
         st.pyplot(fig)
-
-    st.caption(
-        "`Contract`, `OnlineSecurity`/`TechSupport`, `MonthlyCharges` confirmed as drivers by both models. "
-        "Fiber optic's negative coefficient is a multicollinearity artifact (Step 17.3), not a real effect."
+    how_to_read("Left: red bars increase churn risk, blue bars reduce it; longer bars have a bigger effect. "
+                "Right: longer bars mean the feature was used more often to split customers, but it doesn't "
+                "show direction.")
+    coef = results["coef_df"].set_index("feature")["coefficient"]
+    finding(
+        "Contract, OnlineSecurity/TechSupport and MonthlyCharges rank high in both models and in the EDA, "
+        f"confirming them as the main drivers. One result needs care: Fiber optic has a negative coefficient "
+        f"({coef['InternetService_Fiber optic']:.2f}) even though Fiber customers churn the most, because its "
+        f"effect overlaps with MonthlyCharges ({coef['MonthlyCharges']:+.2f}) — Fiber plans cost more.",
+        "Retention actions should focus on the confirmed drivers: moving customers to longer contracts and "
+        "bundling security/support add-ons. Individual coefficients should not be read in isolation when "
+        "features overlap (multicollinearity).",
     )
 
 # ---------------------------------------------------------------------------
