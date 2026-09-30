@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import streamlit as st
@@ -113,15 +114,15 @@ with tab_eda:
     base_rate = df["Churn_numeric"].mean() * 100
 
     def explain(what, why):
-        st.markdown(f"**What we did:** {what}")
-        st.markdown(f"**Why:** {why}")
+        st.markdown(f"**Approach:** {what}")
+        st.markdown(f"**Rationale:** {why}")
 
     def how_to_read(text):
-        st.markdown("**How to read it**")
+        st.markdown("**Reading the chart**")
         st.caption(text)
 
     def finding(text, so_what):
-        st.success(f"**Finding:** {text}\n\n**So what:** {so_what}")
+        st.success(f"**Key finding:** {text}\n\n**Business implication:** {so_what}")
 
     # --- Step 1: Data cleaning ------------------------------------------------
     st.subheader("Step 1 — Load & clean the data")
@@ -190,15 +191,24 @@ with tab_eda:
         "compared the churn rate of every category.",
         "A difference in churn rate between two groups could just be random noise. The Chi-square test checks "
         "whether the difference is large enough to be real: a p-value below 0.05 means there's less than a 5% "
-        "chance of seeing a gap this big if the feature had no relationship with churn.",
+        "chance of seeing a gap this big if the feature had no relationship with churn. Cramér's V then measures "
+        "how strong each relationship is, so the features can be ranked by importance.",
     )
 
     chi2_rows = []
     for col in CATEGORICAL_COLS:
-        chi2, p, _, _ = chi2_contingency(pd.crosstab(df[col], df["Churn"]))
-        chi2_rows.append({"Feature": col, "Chi-square": round(chi2, 1), "p-value": p, "Significant": p < 0.05})
-    chi2_df = pd.DataFrame(chi2_rows).sort_values("p-value").reset_index(drop=True)
-    not_significant = chi2_df.loc[~chi2_df["Significant"], "Feature"].tolist()
+        contingency = pd.crosstab(df[col], df["Churn"])
+        chi2, p, _, _ = chi2_contingency(contingency)
+        # Cramér's V: effect size on a 0-1 scale, comparable across features with different numbers of categories
+        cramers_v = np.sqrt(chi2 / (len(df) * (min(contingency.shape) - 1)))
+        chi2_rows.append({"Feature": col, "Cramér's V": cramers_v, "Chi-square": chi2, "p-value": p,
+                          "Significant": "Yes" if p < 0.05 else "No"})
+    chi2_df = pd.DataFrame(chi2_rows).sort_values("Cramér's V", ascending=False).reset_index(drop=True)
+    chi2_df.insert(0, "Rank", range(1, len(chi2_df) + 1))
+    not_significant = chi2_df.loc[chi2_df["Significant"] == "No", "Feature"].tolist()
+
+    def format_p(p):
+        return "< 0.0001" if p < 0.0001 else f"{p:.4f}"
 
     def top_rate(col):
         rates = df.groupby(col, observed=True)["Churn_numeric"].mean() * 100
@@ -206,17 +216,27 @@ with tab_eda:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.dataframe(chi2_df.style.format({"p-value": "{:.2e}"}), hide_index=True, height=250)
+        st.dataframe(
+            chi2_df.style.format({"Cramér's V": "{:.3f}", "Chi-square": "{:,.1f}", "p-value": format_p}),
+            hide_index=True, height=250,
+        )
     with col2:
-        how_to_read("Features are sorted from strongest to weakest relationship with churn. A higher Chi-square and "
-                    "a smaller p-value mean a stronger relationship; `Significant` is True when p < 0.05.")
+        how_to_read("Features are ranked by Cramér's V, from strongest to weakest relationship with churn. "
+                    "Cramér's V runs from 0 (no relationship) to 1 (perfect relationship): roughly 0.1 is weak, "
+                    "0.3 is moderate and 0.5+ is strong. `Significant` is Yes when p < 0.05.")
+        st.caption("Why not rank by p-value? With 7,000+ customers almost every p-value is tiny (< 0.0001), so it "
+                   "only says whether a relationship exists, not how strong it is. Cramér's V is computed as "
+                   "√(χ² ÷ (n × (k − 1))), where n is the number of customers and k is the smaller number of "
+                   "rows or columns in the table — this removes the effect of sample size and makes features "
+                   "with different numbers of categories comparable.")
     finding(
-        f"{int(chi2_df['Significant'].sum())} of {len(chi2_df)} features are significantly related to churn; only "
+        f"{(chi2_df['Significant'] == 'Yes').sum()} of {len(chi2_df)} features are significantly related to churn; only "
         f"{' and '.join(f'`{c}`' for c in not_significant)} are not. `{chi2_df.loc[0, 'Feature']}` is the strongest. "
         f"Highest-churn categories: {top_rate('Contract')}, {top_rate('InternetService')}, "
         f"{top_rate('PaymentMethod')}.",
         "Churn is driven by how customers are contracted and served, not by who they are — gender makes no "
-        "difference. Contract type, internet service and payment method are the levers worth looking at first.",
+        "difference. Contract type and the OnlineSecurity/TechSupport add-ons rank highest, making them the levers "
+        "worth looking at first.",
     )
 
     cat_choice = st.selectbox("Explore a feature", CATEGORICAL_COLS, index=CATEGORICAL_COLS.index("Contract"))
@@ -237,7 +257,7 @@ with tab_eda:
     with col2:
         how_to_read("Each bar is the share of customers in that category who churned. Bars above the dashed line "
                     "churn more than the company average.")
-        st.markdown(f"**Chi-square p-value:** `{p_value:.4g}` — "
+        st.markdown(f"**Chi-square p-value:** `{format_p(p_value)}` — "
                     + ("significant" if p_value < 0.05 else "not significant"))
         st.dataframe(
             pd.DataFrame({"Churn rate": rate_by_cat.round(1).astype(str) + "%", "n": count_by_cat[rate_by_cat.index]})
@@ -270,7 +290,7 @@ with tab_eda:
     with col2:
         how_to_read("The line inside each box is the median; the box covers the middle 50% of customers. Boxes "
                     "that sit at different heights mean the two groups differ.")
-        st.markdown(f"**Mann-Whitney U p-value:** `{mw_p:.4g}` — " + ("significant" if mw_p < 0.05 else "not significant"))
+        st.markdown(f"**Mann-Whitney U p-value:** `{format_p(mw_p)}` — " + ("significant" if mw_p < 0.05 else "not significant"))
         st.metric("Median — churned", f"{churned.median():,.2f}")
         st.metric("Median — retained", f"{retained.median():,.2f}")
 
