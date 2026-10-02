@@ -52,25 +52,9 @@ with tab_exec:
     def group_stats(mask):
         return int(mask.sum()), df.loc[mask, "Churn_numeric"].mean()
 
-    # --- Problem statement ----------------------------------------------------
-    st.subheader("Problem Statement")
-    st.markdown(
-        f"**{churn_rate:.1%} of our customers cancelled their service**, taking **{lost_share:.0%} of our monthly "
-        "billing** with them. Today we cannot tell who is about to leave or why, so retention offers are not "
-        "targeted. This brief answers four questions:"
-    )
-    st.markdown(
-        "1. How big is the problem?\n"
-        "2. Where is churn concentrated?\n"
-        "3. Why do customers cancel?\n"
-        "4. Can we predict who will leave?"
-    )
-
-    st.divider()
-
     # --- 1. Big picture -------------------------------------------------------
-    st.subheader("1 · Churn at a Glance")
-    st.caption("Starting from our whole customer base: about 1 in 4 customers cancelled.")
+    st.subheader("1 · Customer Overview")
+    st.caption("About 1 in 4 customers cancelled.")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total customers", f"{len(df):,}")
     c2.metric("Stayed", f"{len(df) - len(churned):,}", f"{1 - churn_rate:.1%}", delta_color="off")
@@ -90,51 +74,9 @@ with tab_exec:
 
     st.divider()
 
-    # --- 2. Drill-down tree ---------------------------------------------------
-    st.subheader("2 · Where Churn Is Concentrated")
-    st.caption("Each step keeps only the riskier customers. The group gets smaller, the cancellation rate goes up.")
-
-    levels = [
-        ("All customers", pd.Series(True, index=df.index)),
-        ("+ Month-to-month contract", df["Contract"] == "Month-to-month"),
-        ("+ Fiber optic internet", df["InternetService"] == "Fiber optic"),
-        ("+ Customer under 12 months", df["tenure"] < 12),
-        ("+ No security or support add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
-    ]
-    current = pd.Series(True, index=df.index)
-    funnel = []
-    for label, condition in levels:
-        current = current & condition
-        funnel.append((label, *group_stats(current)))
-
-    reds = sns.color_palette("Reds", 101)
-    widest = funnel[0][1]
-    fig, ax = plt.subplots(figsize=(8, 3.4))
-    for i, (label, n, rate) in enumerate(funnel):
-        ax.barh(i, n, left=(widest - n) / 2, height=0.8, color=reds[min(int(rate * 100) + 15, 100)])
-        ax.text(-widest * 0.02, i, label, ha="right", va="center", fontsize=10)
-        ax.text(widest * 1.02, i, f"{n:,} customers  ·  {rate:.0%} cancel", ha="left", va="center",
-                fontsize=10, fontweight="bold" if i == len(funnel) - 1 else "normal")
-    ax.set_xlim(0, widest)
-    ax.invert_yaxis()
-    ax.axis("off")
-    col1, _ = st.columns([4, 1])
-    with col1:
-        st.pyplot(fig)
-
-    segment_n, segment_rate = group_stats(current)
-    segment_churn_share = df.loc[current, "Churn_numeric"].sum() / len(churned)
-    s1, s2, s3 = st.columns(3)
-    s1.metric("Priority segment", f"{segment_n:,} customers", f"{current.mean():.1%} of all customers", delta_color="off")
-    s2.metric("Cancellation rate", f"{segment_rate:.0%}", f"{segment_rate / churn_rate:.1f}× the average", delta_color="off")
-    s3.metric("Share of all cancellations", f"{segment_churn_share:.0%}")
-
-    st.divider()
-
-    # --- 3. Drivers -----------------------------------------------------------
-    st.subheader("3 · Why Customers Cancel")
-    st.caption("How many times more likely one group is to cancel than the other. "
-               "1× means no difference; the longer the bar, the stronger the factor.")
+    # --- 2. Drivers -----------------------------------------------------------
+    st.subheader("2 · Why Customers Cancel")
+    st.caption("How many times more likely each group is to cancel. 1× = no difference.")
 
     drivers = [
         ("Month-to-month contract\nvs 1–2 year contract", df["Contract"] == "Month-to-month", None),
@@ -167,24 +109,19 @@ with tab_exec:
     with col1:
         st.pyplot(fig)
 
-    st.markdown(
-        f"- **Contract is the biggest factor.** Month-to-month customers are {ratios[0][1]:.1f}× more likely to "
-        "cancel — they have no commitment and can leave at any time.\n"
-        "- **Add-ons keep customers.** Customers without security or support services have less reason to stay.\n"
-        "- **The first year is the riskiest.** New customers have not yet built loyalty.\n"
-        "- **Who the customer is does not matter.** Men and women cancel at the same rate."
-    )
+    st.markdown("**Contract type matters most.** What customers buy and how long they've stayed drive "
+                "cancellations — not who they are.")
 
     st.divider()
 
-    # --- 4. Model evaluation --------------------------------------------------
+    # --- 3. Model evaluation --------------------------------------------------
     eval_results = get_evaluation_results(df)
     cm = eval_results["confusion_matrices"]["Logistic Regression"]
     caught, missed = cm[1, 1], cm[1, 0]
     n_test, n_leavers = eval_results["n_test"], eval_results["n_churn_test"]
     cv_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
 
-    st.subheader("4 · Can We Predict Who Will Leave?")
+    st.subheader("3 · Can We Predict Who Will Leave?")
     st.caption(f"Tested on {n_test:,} customers the model had never seen, and re-tested 5 times "
                f"(results varied by only ± {cv_recall.std() * 100:.1f} pts).")
 
@@ -219,15 +156,6 @@ with tab_exec:
         ax.set_xticks([])
         st.pyplot(fig)
 
-    st.divider()
-
-    # --- 5. Recommended actions -----------------------------------------------
-    st.subheader("Recommended Actions")
-    st.markdown(
-        "1. **Offer longer contracts** — move month-to-month customers to 1- or 2-year plans.\n"
-        "2. **Bundle protection services** — include security and tech support for new Fiber customers.\n"
-        "3. **Engage new customers early** — use the risk score to contact at-risk customers in their first 6 months."
-    )
 
 # ---------------------------------------------------------------------------
 # Tab 1: Overview (problem statement, executive summary, recommendations)
