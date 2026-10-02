@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import streamlit as st
@@ -112,48 +111,30 @@ with tab_exec:
 
     st.divider()
 
-    # --- 3. Model evaluation --------------------------------------------------
-    eval_results = get_evaluation_results(df)
-    cm = eval_results["confusion_matrices"]["Logistic Regression"]
-    caught, missed = cm[1, 1], cm[1, 0]
-    n_test, n_leavers = eval_results["n_test"], eval_results["n_churn_test"]
-    cv_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
-
+    # --- 3. Model evaluation (5-fold cross-validation) -----------------------
     st.subheader("3 · Can We Predict Who Will Leave?")
-    st.caption(f"Tested on {n_test:,} customers the model had never seen, and re-tested 5 times "
-               f"(results varied by only ± {cv_recall.std() * 100:.1f} pts).")
+    st.caption("Each model was tested 5 times on different customer groups. ± shows how much results changed "
+               "between tests.")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**Of {n_leavers:,} customers who left, the model flagged {caught / n_leavers:.0%}**")
-        fig, ax = plt.subplots(figsize=(5, 1.1))
-        ax.barh([0], [caught], color="#4C72B0")
-        ax.barh([0], [missed], left=[caught], color="#D9D9D9")
-        ax.text(caught / 2, 0, f"Flagged {caught:,}", ha="center", va="center", color="white", fontsize=10)
-        ax.text(caught + missed / 2, 0, f"Missed {missed:,}", ha="center", va="center", fontsize=10)
-        ax.set_xlim(0, n_leavers)
-        ax.axis("off")
-        st.pyplot(fig)
+    plain_metrics = {
+        "recall": "Leavers caught",
+        "precision": "Alerts that were correct",
+        "accuracy": "Overall accuracy",
+        "roc_auc": "Ranking quality (0–1)",
+    }
+    cv_rows = {}
+    for name, scores in get_robustness_results(df)["cv_results"].items():
+        label = f"{name} (selected)" if name == "Logistic Regression" else name
+        cv_rows[label] = {
+            plain: (f"{scores[f'test_{key}'].mean():.3f} ± {scores[f'test_{key}'].std():.3f}" if key == "roc_auc"
+                    else f"{scores[f'test_{key}'].mean():.1%} ± {scores[f'test_{key}'].std() * 100:.1f}")
+            for key, plain in plain_metrics.items()
+        }
+    st.dataframe(pd.DataFrame(cv_rows).T, width="stretch")
 
-    contact_share = 0.2
-    y_test, proba = eval_results["y_test"], eval_results["lr_test_proba"]
-    top = np.argsort(-proba)[: int(len(y_test) * contact_share)]
-    reached = y_test[top].sum() / y_test.sum()
-    with col2:
-        st.markdown(f"**Contacting 1 in 5 customers reaches {reached:.0%} of leavers — "
-                    f"{reached / contact_share:.1f}× better than random**")
-        fig, ax = plt.subplots(figsize=(5, 1.6))
-        ax.barh([0, 1], [contact_share * 100, reached * 100], color=["#BFBFBF", "#4C72B0"], height=0.6)
-        for yi, v in enumerate([contact_share * 100, reached * 100]):
-            ax.text(v + 1, yi, f"{v:.0f}% of leavers", va="center", fontsize=10)
-        ax.set_yticks([0, 1])
-        ax.set_yticklabels(["Random", "Model-guided"])
-        ax.set_xlim(0, 100)
-        ax.invert_yaxis()
-        ax.spines[["top", "right", "bottom"]].set_visible(False)
-        ax.set_xticks([])
-        st.pyplot(fig)
-
+    lr_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
+    st.markdown(f"**The selected model catches about {lr_recall.mean():.0%} of customers who leave, "
+                "and the result is consistent across all 5 tests.**")
 
 # ---------------------------------------------------------------------------
 # Tab 1: Overview (problem statement, executive summary, recommendations)
