@@ -102,9 +102,9 @@ with tab_exec:
         ax.set_yticks([])
         ax.grid(False)
         ax.spines[["top", "right", "left"]].set_visible(False)
-    fig.tight_layout()
-    col1, _ = st.columns([3, 1])
-    with col1:
+    fig.tight_layout(w_pad=4, h_pad=3)
+    _, col, _ = st.columns([1, 4, 1])
+    with col:
         st.pyplot(fig)
 
     st.markdown("**Contract type matters most.** What customers buy and how long they've stayed drive "
