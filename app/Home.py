@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import streamlit as st
@@ -48,23 +49,25 @@ with tab_exec:
     lost_billing = churned["MonthlyCharges"].sum()
     lost_share = lost_billing / df["MonthlyCharges"].sum()
 
-    # Level 1 — the big picture
-    st.subheader(f"1 in 4 customers left — taking {lost_share:.0%} of monthly billing with them")
+    # --- 1. Big picture -------------------------------------------------------
+    st.subheader("Churn at a Glance")
+    st.caption(f"About 1 in 4 customers cancelled, and they accounted for {lost_share:.0%} of our monthly billing.")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Churn rate", f"{churn_rate:.1%}")
-    c2.metric("Customers lost", f"{len(churned):,}")
+    c1.metric("Customers who cancelled", f"{churn_rate:.1%}")
+    c2.metric("Number of customers lost", f"{len(churned):,}")
     c3.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
 
     st.divider()
 
-    # Level 2 — drill down: each filter narrows the base and raises the churn rate
-    st.subheader("Drilling down, churn concentrates in one group")
+    # --- 2. Drill down --------------------------------------------------------
+    st.subheader("Where Churn Is Concentrated")
+    st.caption("Each bar adds one more customer trait. The narrower the group, the higher the share who cancel.")
     steps = [
         ("All customers", pd.Series(True, index=df.index)),
         ("+ Month-to-month contract", df["Contract"] == "Month-to-month"),
         ("+ Fiber optic internet", df["InternetService"] == "Fiber optic"),
-        ("+ Customer < 12 months", df["tenure"] < 12),
-        ("+ No security / support add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
+        ("+ Customer for under 12 months", df["tenure"] < 12),
+        ("+ No security or support add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
     ]
     mask = pd.Series(True, index=df.index)
     funnel = []
@@ -79,9 +82,9 @@ with tab_exec:
     colors = sns.color_palette("Reds", len(funnel) + 1)[1:][::-1]  # darkest = highest-risk group (bottom bar)
     ax.barh(labels, rates, color=colors)
     for y, (rate, n) in enumerate(zip(rates, counts)):
-        ax.text(rate + 1, y, f"{rate:.0f}% churn  ·  {n:,} customers", va="center", fontsize=9)
+        ax.text(rate + 1, y, f"{rate:.0f}% cancelled  ·  {n:,} customers", va="center", fontsize=9)
     ax.set_xlim(0, 100)
-    ax.set_xlabel("Churn rate (%)")
+    ax.set_xlabel("Share of customers who cancelled (%)")
     ax.spines[["top", "right"]].set_visible(False)
     col1, _ = st.columns([3, 1])
     with col1:
@@ -89,45 +92,91 @@ with tab_exec:
 
     st.divider()
 
-    # Level 3 — the segment to act on
+    # --- 3. Priority segment --------------------------------------------------
     segment = mask
+    segment_rate = df.loc[segment, "Churn_numeric"].mean()
     segment_share = segment.mean()
     segment_churn_share = df.loc[segment, "Churn_numeric"].sum() / len(churned)
-    st.subheader(f"{segment_share:.0%} of customers → {segment_churn_share:.0%} of all churn")
+    st.subheader("Priority Customer Segment")
+    st.caption(f"A small group — {segment_share:.0%} of customers — accounts for {segment_churn_share:.0%} of all "
+               "cancellations. This is where retention effort pays off most.")
     col1, col2 = st.columns([1, 2])
     with col1:
         fig, ax = plt.subplots(figsize=(3, 3))
-        ax.pie([segment_churn_share, 1 - segment_churn_share], labels=["High-risk\nsegment", "Everyone\nelse"],
+        ax.pie([segment_churn_share, 1 - segment_churn_share], labels=["Priority\nsegment", "All other\ncustomers"],
                colors=["#C44E52", "#D9D9D9"], startangle=90, counterclock=False,
                wedgeprops=dict(width=0.4), autopct="%.0f%%", pctdistance=0.8)
-        ax.set_title("Share of churned customers", fontsize=10)
+        ax.set_title("Share of all cancellations", fontsize=10)
         st.pyplot(fig)
     with col2:
         s1, s2, s3 = st.columns(3)
-        s1.metric("Customers", f"{int(segment.sum()):,}")
-        s2.metric("Churn rate", f"{df.loc[segment, 'Churn_numeric'].mean():.0%}")
-        s3.metric("vs company average", f"{df.loc[segment, 'Churn_numeric'].mean() / churn_rate:.1f}×")
+        s1.metric("Customers in segment", f"{int(segment.sum()):,}")
+        s2.metric("Cancellation rate", f"{segment_rate:.0%}")
+        s3.metric("Compared with average", f"{segment_rate / churn_rate:.1f}× higher")
 
     st.divider()
 
-    # Level 4 — we can find them in advance
+    # --- 4. Model evaluation --------------------------------------------------
     eval_results = get_evaluation_results(df)
+    metrics = eval_results["metrics_df"]
     cm = eval_results["confusion_matrices"]["Logistic Regression"]
-    st.subheader(f"Our model flags {cm[1, 1] / cm[1].sum():.0%} of leavers before they go")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Leavers caught (test set)", f"{cm[1, 1]:,} of {cm[1].sum():,}")
-    c2.metric("Ranking accuracy (ROC-AUC)", f"{eval_results['metrics_df'].loc['Logistic Regression', 'ROC-AUC']:.2f}")
+    caught, missed, false_alarms = cm[1, 1], cm[1, 0], cm[0, 1]
+    n_test, n_leavers = eval_results["n_test"], eval_results["n_churn_test"]
     cv_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
-    c3.metric("Variation across 5 re-tests", f"± {cv_recall.std() * 100:.1f} pts")
+
+    st.subheader("Model Evaluation")
+    st.caption("We built a model that scores each customer's risk of leaving, then tested it on customers it had "
+               "never seen before.")
+
+    e1, e2, e3 = st.columns(3)
+    e1.info(f"**1 · Learn**\n\nThe model learned from {len(df) - n_test:,} past customers")
+    e2.info(f"**2 · Test**\n\nWe checked it on {n_test:,} different customers whose outcome we already knew")
+    e3.info("**3 · Re-test**\n\nWe repeated the test 5 times on different groups to make sure the result holds")
+
+    col1, col2 = st.columns([3, 2])
+    with col1:
+        st.markdown("**Two models compared — we chose the one that catches more leavers**")
+        plain_names = {
+            "Recall (churn)": "Leavers correctly flagged",
+            "Precision (churn)": "Alerts that were correct",
+            "Accuracy": "All predictions correct",
+        }
+        compare = metrics[list(plain_names)].rename(columns=plain_names).T * 100
+        fig, ax = plt.subplots(figsize=(5.5, 2.8))
+        y = np.arange(len(compare))
+        ax.barh(y - 0.2, compare["Logistic Regression"], height=0.4, color="#4C72B0", label="Selected model")
+        ax.barh(y + 0.2, compare["Random Forest"], height=0.4, color="#BFBFBF", label="Alternative model")
+        for yi, (sel, alt) in enumerate(zip(compare["Logistic Regression"], compare["Random Forest"])):
+            ax.text(sel + 1, yi - 0.2, f"{sel:.0f}%", va="center", fontsize=8)
+            ax.text(alt + 1, yi + 0.2, f"{alt:.0f}%", va="center", fontsize=8)
+        ax.set_yticks(y)
+        ax.set_yticklabels(compare.index)
+        ax.set_xlim(0, 100)
+        ax.invert_yaxis()
+        ax.legend(fontsize=7, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False)
+        ax.spines[["top", "right"]].set_visible(False)
+        st.pyplot(fig)
+    with col2:
+        st.markdown(f"**Test result on {n_leavers:,} customers who actually left**")
+        r1, r2 = st.columns(2)
+        r1.metric("Correctly flagged", f"{caught:,}", f"{caught / n_leavers:.0%}", delta_color="off")
+        r2.metric("Missed", f"{missed:,}", f"{missed / n_leavers:.0%}", delta_color="off")
+        r3, r4 = st.columns(2)
+        r3.metric("False alarms", f"{false_alarms:,}", help="Customers flagged as at risk who actually stayed")
+        r4.metric("Consistency (5 re-tests)", f"± {cv_recall.std() * 100:.1f} pts",
+                  help="How much the share of leavers flagged changed across the 5 re-tests")
+
+    st.caption("Why we chose this model: missing a customer who is about to leave costs us their revenue, while a "
+               "false alarm only costs a retention offer. So we picked the model that catches the most leavers.")
 
     st.divider()
 
-    # Level 5 — the ask
-    st.subheader("What we propose")
+    # --- 5. Recommended actions -----------------------------------------------
+    st.subheader("Recommended Actions")
     a1, a2, a3 = st.columns(3)
-    a1.info("**Lock in contracts**\n\nMove month-to-month customers to 1–2 year plans")
-    a2.info("**Bundle protection**\n\nSecurity & support add-ons for new Fiber customers")
-    a3.info("**Act early**\n\nRisk-score outreach in the first 6 months")
+    a1.success("**Offer longer contracts**\n\nMove month-to-month customers to 1- or 2-year plans")
+    a2.success("**Bundle protection services**\n\nInclude security and tech support for new Fiber customers")
+    a3.success("**Engage new customers early**\n\nUse the risk score to contact at-risk customers in their first 6 months")
 
 # ---------------------------------------------------------------------------
 # Tab 1: Overview (problem statement, executive summary, recommendations)
