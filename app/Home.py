@@ -76,35 +76,33 @@ with tab_exec:
 
     # --- 2. Drivers -----------------------------------------------------------
     st.subheader("2 · Why Customers Cancel")
-    st.caption("How many times more likely each group is to cancel. 1× = no difference.")
+    st.caption("Share of customers who cancelled in each group.")
 
     drivers = [
-        ("Month-to-month contract\nvs 1–2 year contract", df["Contract"] == "Month-to-month", None),
-        ("No security or support add-on\nvs has an add-on",
+        ("Contract", "Month-to-\nmonth", "1–2 year", df["Contract"] == "Month-to-month", None),
+        ("Security / support add-on", "None", "Has one",
          (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No"), df["InternetService"] != "No"),
-        ("Customer for under 12 months\nvs 12 months or longer", df["tenure"] < 12, None),
-        ("Pays by electronic check\nvs other payment methods", df["PaymentMethod"] == "Electronic check", None),
-        ("Fiber optic internet\nvs DSL internet", df["InternetService"] == "Fiber optic", df["InternetService"] != "No"),
-        ("Male\nvs female", df["gender"] == "Male", None),
+        ("Time as customer", "Under\n12 months", "12+ months", df["tenure"] < 12, None),
+        ("Payment method", "Electronic\ncheck", "Other", df["PaymentMethod"] == "Electronic check", None),
+        ("Internet service", "Fiber optic", "DSL", df["InternetService"] == "Fiber optic", df["InternetService"] != "No"),
+        ("Gender", "Male", "Female", df["gender"] == "Male", None),
     ]
-    ratios = []
-    for label, risk_mask, scope in drivers:
+    fig, axes = plt.subplots(2, 3, figsize=(8, 4.6), sharey=True)
+    for ax, (title, risk_name, other_name, risk_mask, scope) in zip(axes.flat, drivers):
         scope = pd.Series(True, index=df.index) if scope is None else scope
-        ratios.append((label, group_stats(scope & risk_mask)[1] / group_stats(scope & ~risk_mask)[1]))
-
-    fig, ax = plt.subplots(figsize=(7, 3.8))
-    y = np.arange(len(ratios))
-    values = [r[1] for r in ratios]
-    ax.barh(y, values, color=["#C44E52" if v >= 1.5 else "#BFBFBF" for v in values], height=0.6)
-    for yi, v in enumerate(values):
-        ax.text(v + 0.1, yi, f"{v:.1f}×", va="center", fontsize=10, fontweight="bold")
-    ax.axvline(1, color="#666666", linestyle="--", linewidth=1)
-    ax.set_yticks(y)
-    ax.set_yticklabels([r[0] for r in ratios], fontsize=9)
-    ax.set_xlim(0, max(values) + 1)
-    ax.set_xlabel("Times more likely to cancel")
-    ax.invert_yaxis()
-    ax.spines[["top", "right"]].set_visible(False)
+        values = [group_stats(scope & risk_mask)[1] * 100, group_stats(scope & ~risk_mask)[1] * 100]
+        risk_color = "#BFBFBF" if title == "Gender" else "#C44E52"
+        ax.bar([0, 1], values, color=[risk_color, "#D9D9D9"], width=0.6)
+        for x, v in enumerate(values):
+            ax.text(x, v + 1.5, f"{v:.0f}%", ha="center", fontsize=10, fontweight="bold")
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels([risk_name, other_name], fontsize=8)
+        ax.set_title(title, fontsize=10, fontweight="bold")
+        ax.set_ylim(0, 60)
+        ax.set_yticks([])
+        ax.grid(False)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+    fig.tight_layout()
     col1, _ = st.columns([3, 1])
     with col1:
         st.pyplot(fig)
