@@ -35,9 +35,99 @@ df = load_clean_data()
 
 st.title("Customer Churn Analysis")
 
-tab_problem, tab_eda, tab_models, tab_predict = st.tabs(
-    ["Overview", "Exploratory Data Analysis", "Model Results", "Churn Predictor"]
+tab_exec, tab_problem, tab_eda, tab_models, tab_predict = st.tabs(
+    ["Executive Brief", "Overview", "Exploratory Data Analysis", "Model Results", "Churn Predictor"]
 )
+
+# ---------------------------------------------------------------------------
+# Tab 0: Executive Brief (big picture first, then drill down to the segment to act on)
+# ---------------------------------------------------------------------------
+with tab_exec:
+    churned = df[df["Churn_numeric"] == 1]
+    churn_rate = len(churned) / len(df)
+    lost_billing = churned["MonthlyCharges"].sum()
+    lost_share = lost_billing / df["MonthlyCharges"].sum()
+
+    # Level 1 — the big picture
+    st.subheader(f"1 in 4 customers left — taking {lost_share:.0%} of monthly billing with them")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Churn rate", f"{churn_rate:.1%}")
+    c2.metric("Customers lost", f"{len(churned):,}")
+    c3.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
+
+    st.divider()
+
+    # Level 2 — drill down: each filter narrows the base and raises the churn rate
+    st.subheader("Drilling down, churn concentrates in one group")
+    steps = [
+        ("All customers", pd.Series(True, index=df.index)),
+        ("+ Month-to-month contract", df["Contract"] == "Month-to-month"),
+        ("+ Fiber optic internet", df["InternetService"] == "Fiber optic"),
+        ("+ Customer < 12 months", df["tenure"] < 12),
+        ("+ No security / support add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
+    ]
+    mask = pd.Series(True, index=df.index)
+    funnel = []
+    for label, condition in steps:
+        mask &= condition
+        funnel.append((label, int(mask.sum()), df.loc[mask, "Churn_numeric"].mean()))
+
+    fig, ax = plt.subplots(figsize=(8, 3.2))
+    labels = [f[0] for f in funnel][::-1]
+    rates = [f[2] * 100 for f in funnel][::-1]
+    counts = [f[1] for f in funnel][::-1]
+    colors = sns.color_palette("Reds", len(funnel) + 1)[1:][::-1]  # darkest = highest-risk group (bottom bar)
+    ax.barh(labels, rates, color=colors)
+    for y, (rate, n) in enumerate(zip(rates, counts)):
+        ax.text(rate + 1, y, f"{rate:.0f}% churn  ·  {n:,} customers", va="center", fontsize=9)
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Churn rate (%)")
+    ax.spines[["top", "right"]].set_visible(False)
+    col1, _ = st.columns([3, 1])
+    with col1:
+        st.pyplot(fig)
+
+    st.divider()
+
+    # Level 3 — the segment to act on
+    segment = mask
+    segment_share = segment.mean()
+    segment_churn_share = df.loc[segment, "Churn_numeric"].sum() / len(churned)
+    st.subheader(f"{segment_share:.0%} of customers → {segment_churn_share:.0%} of all churn")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        fig, ax = plt.subplots(figsize=(3, 3))
+        ax.pie([segment_churn_share, 1 - segment_churn_share], labels=["High-risk\nsegment", "Everyone\nelse"],
+               colors=["#C44E52", "#D9D9D9"], startangle=90, counterclock=False,
+               wedgeprops=dict(width=0.4), autopct="%.0f%%", pctdistance=0.8)
+        ax.set_title("Share of churned customers", fontsize=10)
+        st.pyplot(fig)
+    with col2:
+        s1, s2, s3 = st.columns(3)
+        s1.metric("Customers", f"{int(segment.sum()):,}")
+        s2.metric("Churn rate", f"{df.loc[segment, 'Churn_numeric'].mean():.0%}")
+        s3.metric("vs company average", f"{df.loc[segment, 'Churn_numeric'].mean() / churn_rate:.1f}×")
+
+    st.divider()
+
+    # Level 4 — we can find them in advance
+    eval_results = get_evaluation_results(df)
+    cm = eval_results["confusion_matrices"]["Logistic Regression"]
+    st.subheader(f"Our model flags {cm[1, 1] / cm[1].sum():.0%} of leavers before they go")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Leavers caught (test set)", f"{cm[1, 1]:,} of {cm[1].sum():,}")
+    c2.metric("Ranking accuracy (ROC-AUC)", f"{eval_results['metrics_df'].loc['Logistic Regression', 'ROC-AUC']:.2f}")
+    cv_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
+    c3.metric("Variation across 5 re-tests", f"± {cv_recall.std() * 100:.1f} pts")
+
+    st.divider()
+
+    # Level 5 — the ask
+    st.subheader("What we propose")
+    a1, a2, a3 = st.columns(3)
+    a1.info("**Lock in contracts**\n\nMove month-to-month customers to 1–2 year plans")
+    a2.info("**Bundle protection**\n\nSecurity & support add-ons for new Fiber customers")
+    a3.info("**Act early**\n\nRisk-score outreach in the first 6 months")
 
 # ---------------------------------------------------------------------------
 # Tab 1: Overview (problem statement, executive summary, recommendations)
