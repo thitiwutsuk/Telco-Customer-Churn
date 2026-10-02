@@ -59,11 +59,12 @@ with tab_exec:
         "billing** with them. Today we cannot tell who is about to leave or why, so retention offers are not "
         "targeted. This brief answers four questions:"
     )
-    q1, q2, q3, q4 = st.columns(4)
-    q1.info("**1 · How big is the problem?**")
-    q2.info("**2 · Where is churn concentrated?**")
-    q3.info("**3 · Why do customers cancel?**")
-    q4.info("**4 · Can we predict who will leave?**")
+    st.markdown(
+        "1. How big is the problem?\n"
+        "2. Where is churn concentrated?\n"
+        "3. Why do customers cancel?\n"
+        "4. Can we predict who will leave?"
+    )
 
     st.divider()
 
@@ -131,46 +132,47 @@ with tab_exec:
 
     # --- 3. Drivers -----------------------------------------------------------
     st.subheader("3 · Why Customers Cancel")
-    st.caption("Cancellation rate of the higher-risk group versus everyone else, for each factor. "
-               "The bigger the gap, the stronger the factor. Gender is shown for comparison — it makes no difference.")
+    st.caption("How many times more likely one group is to cancel than the other. "
+               "1× means no difference; the longer the bar, the stronger the factor.")
 
     drivers = [
-        ("Contract", "Month-to-month", "1–2 year", df["Contract"] == "Month-to-month", None),
-        ("Security / support", "No add-on", "Has add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No"),
-         df["InternetService"] != "No"),
-        ("Customer tenure", "Under 12 months", "12+ months", df["tenure"] < 12, None),
-        ("Payment method", "Electronic check", "Other methods", df["PaymentMethod"] == "Electronic check", None),
-        ("Internet service", "Fiber optic", "DSL", df["InternetService"] == "Fiber optic", df["InternetService"] != "No"),
-        ("Gender", "Male", "Female", df["gender"] == "Male", None),
+        ("Month-to-month contract\nvs 1–2 year contract", df["Contract"] == "Month-to-month", None),
+        ("No security or support add-on\nvs has an add-on",
+         (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No"), df["InternetService"] != "No"),
+        ("Customer for under 12 months\nvs 12 months or longer", df["tenure"] < 12, None),
+        ("Pays by electronic check\nvs other payment methods", df["PaymentMethod"] == "Electronic check", None),
+        ("Fiber optic internet\nvs DSL internet", df["InternetService"] == "Fiber optic", df["InternetService"] != "No"),
+        ("Male\nvs female", df["gender"] == "Male", None),
     ]
-    rows = []
-    for factor, risk_name, other_name, risk_mask, scope in drivers:
+    ratios = []
+    for label, risk_mask, scope in drivers:
         scope = pd.Series(True, index=df.index) if scope is None else scope
-        rows.append((factor, risk_name, group_stats(scope & risk_mask)[1] * 100,
-                     other_name, group_stats(scope & ~risk_mask)[1] * 100))
+        ratios.append((label, group_stats(scope & risk_mask)[1] / group_stats(scope & ~risk_mask)[1]))
 
-    fig, ax = plt.subplots(figsize=(8, 3.6))
-    y = np.arange(len(rows))
-    risk_vals, other_vals = [r[2] for r in rows], [r[4] for r in rows]
-    ax.barh(y - 0.2, risk_vals, height=0.4, color=["#C44E52"] * (len(rows) - 1) + ["#BFBFBF"])
-    ax.barh(y + 0.2, other_vals, height=0.4, color="#D9D9D9")
-    for yi, (_, risk_name, risk_val, other_name, other_val) in enumerate(rows):
-        ax.text(risk_val + 1, yi - 0.2, f"{risk_name}  {risk_val:.0f}%", va="center", fontsize=8)
-        ax.text(other_val + 1, yi + 0.2, f"{other_name}  {other_val:.0f}%", va="center", fontsize=8, color="#666666")
+    fig, ax = plt.subplots(figsize=(7, 3.8))
+    y = np.arange(len(ratios))
+    values = [r[1] for r in ratios]
+    ax.barh(y, values, color=["#C44E52" if v >= 1.5 else "#BFBFBF" for v in values], height=0.6)
+    for yi, v in enumerate(values):
+        ax.text(v + 0.1, yi, f"{v:.1f}×", va="center", fontsize=10, fontweight="bold")
+    ax.axvline(1, color="#666666", linestyle="--", linewidth=1)
     ax.set_yticks(y)
-    ax.set_yticklabels([r[0] for r in rows])
-    ax.set_xlim(0, 70)
-    ax.set_xlabel("Share of customers who cancelled (%)")
+    ax.set_yticklabels([r[0] for r in ratios], fontsize=9)
+    ax.set_xlim(0, max(values) + 1)
+    ax.set_xlabel("Times more likely to cancel")
     ax.invert_yaxis()
     ax.spines[["top", "right"]].set_visible(False)
     col1, _ = st.columns([3, 1])
     with col1:
         st.pyplot(fig)
 
-    f1, f2, f3 = st.columns(3)
-    f1.warning("**No long-term commitment**\n\nMonth-to-month customers can leave at any time")
-    f2.warning("**No added value**\n\nCustomers without security or support add-ons have less reason to stay")
-    f3.warning("**Early in the relationship**\n\nNew customers have not yet built loyalty")
+    st.markdown(
+        f"- **Contract is the biggest factor.** Month-to-month customers are {ratios[0][1]:.1f}× more likely to "
+        "cancel — they have no commitment and can leave at any time.\n"
+        "- **Add-ons keep customers.** Customers without security or support services have less reason to stay.\n"
+        "- **The first year is the riskiest.** New customers have not yet built loyalty.\n"
+        "- **Who the customer is does not matter.** Men and women cancel at the same rate."
+    )
 
     st.divider()
 
@@ -186,10 +188,11 @@ with tab_exec:
     st.caption("We built a model that scores each customer's risk of leaving, then tested it on customers it had "
                "never seen before.")
 
-    e1, e2, e3 = st.columns(3)
-    e1.info(f"**Learn**\n\nThe model learned from {len(df) - n_test:,} past customers")
-    e2.info(f"**Test**\n\nWe checked it on {n_test:,} different customers whose outcome we already knew")
-    e3.info("**Re-test**\n\nWe repeated the test 5 times on different groups to make sure the result holds")
+    st.markdown(
+        f"**How we tested it:** the model learned from {len(df) - n_test:,} past customers, was then checked on "
+        f"{n_test:,} different customers whose outcome we already knew, and the test was repeated 5 times on "
+        "different groups to make sure the result holds."
+    )
 
     col1, col2 = st.columns([3, 2])
     with col1:
@@ -231,10 +234,11 @@ with tab_exec:
 
     # --- 5. Recommended actions -----------------------------------------------
     st.subheader("Recommended Actions")
-    a1, a2, a3 = st.columns(3)
-    a1.success("**Offer longer contracts**\n\nMove month-to-month customers to 1- or 2-year plans")
-    a2.success("**Bundle protection services**\n\nInclude security and tech support for new Fiber customers")
-    a3.success("**Engage new customers early**\n\nUse the risk score to contact at-risk customers in their first 6 months")
+    st.markdown(
+        "1. **Offer longer contracts** — move month-to-month customers to 1- or 2-year plans.\n"
+        "2. **Bundle protection services** — include security and tech support for new Fiber customers.\n"
+        "3. **Engage new customers early** — use the risk score to contact at-risk customers in their first 6 months."
+    )
 
 # ---------------------------------------------------------------------------
 # Tab 1: Overview (problem statement, executive summary, recommendations)
