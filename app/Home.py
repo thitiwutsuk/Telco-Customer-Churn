@@ -49,70 +49,128 @@ with tab_exec:
     lost_billing = churned["MonthlyCharges"].sum()
     lost_share = lost_billing / df["MonthlyCharges"].sum()
 
-    # --- 1. Big picture -------------------------------------------------------
-    st.subheader("Churn at a Glance")
-    st.caption(f"About 1 in 4 customers cancelled, and they accounted for {lost_share:.0%} of our monthly billing.")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Customers who cancelled", f"{churn_rate:.1%}")
-    c2.metric("Number of customers lost", f"{len(churned):,}")
-    c3.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
+    def group_stats(mask):
+        return int(mask.sum()), df.loc[mask, "Churn_numeric"].mean()
+
+    # --- Problem statement ----------------------------------------------------
+    st.subheader("Problem Statement")
+    st.markdown(
+        f"**{churn_rate:.1%} of our customers cancelled their service**, taking **{lost_share:.0%} of our monthly "
+        "billing** with them. Today we cannot tell who is about to leave or why, so retention offers are not "
+        "targeted. This brief answers four questions:"
+    )
+    q1, q2, q3, q4 = st.columns(4)
+    q1.info("**1 · How big is the problem?**")
+    q2.info("**2 · Where is churn concentrated?**")
+    q3.info("**3 · Why do customers cancel?**")
+    q4.info("**4 · Can we predict who will leave?**")
 
     st.divider()
 
-    # --- 2. Drill down --------------------------------------------------------
-    st.subheader("Where Churn Is Concentrated")
-    st.caption("Each bar adds one more customer trait. The narrower the group, the higher the share who cancel.")
-    steps = [
-        ("All customers", pd.Series(True, index=df.index)),
-        ("+ Month-to-month contract", df["Contract"] == "Month-to-month"),
-        ("+ Fiber optic internet", df["InternetService"] == "Fiber optic"),
-        ("+ Customer for under 12 months", df["tenure"] < 12),
-        ("+ No security or support add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
-    ]
-    mask = pd.Series(True, index=df.index)
-    funnel = []
-    for label, condition in steps:
-        mask &= condition
-        funnel.append((label, int(mask.sum()), df.loc[mask, "Churn_numeric"].mean()))
+    # --- 1. Big picture -------------------------------------------------------
+    st.subheader("1 · Churn at a Glance")
+    st.caption("Starting from our whole customer base: about 1 in 4 customers cancelled.")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total customers", f"{len(df):,}")
+    c2.metric("Stayed", f"{len(df) - len(churned):,}", f"{1 - churn_rate:.1%}", delta_color="off")
+    c3.metric("Cancelled", f"{len(churned):,}", f"{churn_rate:.1%}", delta_color="off")
+    c4.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
 
-    fig, ax = plt.subplots(figsize=(8, 3.2))
-    labels = [f[0] for f in funnel][::-1]
-    rates = [f[2] * 100 for f in funnel][::-1]
-    counts = [f[1] for f in funnel][::-1]
-    colors = sns.color_palette("Reds", len(funnel) + 1)[1:][::-1]  # darkest = highest-risk group (bottom bar)
-    ax.barh(labels, rates, color=colors)
-    for y, (rate, n) in enumerate(zip(rates, counts)):
-        ax.text(rate + 1, y, f"{rate:.0f}% cancelled  ·  {n:,} customers", va="center", fontsize=9)
-    ax.set_xlim(0, 100)
-    ax.set_xlabel("Share of customers who cancelled (%)")
-    ax.spines[["top", "right"]].set_visible(False)
+    fig, ax = plt.subplots(figsize=(8, 0.9))
+    ax.barh([0], [1 - churn_rate], color="#55A868")
+    ax.barh([0], [churn_rate], left=[1 - churn_rate], color="#C44E52")
+    ax.text((1 - churn_rate) / 2, 0, f"Stayed  {len(df) - len(churned):,}", ha="center", va="center", color="white")
+    ax.text(1 - churn_rate / 2, 0, f"Cancelled  {len(churned):,}", ha="center", va="center", color="white")
+    ax.set_xlim(0, 1)
+    ax.axis("off")
     col1, _ = st.columns([3, 1])
     with col1:
         st.pyplot(fig)
 
     st.divider()
 
-    # --- 3. Priority segment --------------------------------------------------
-    segment = mask
-    segment_rate = df.loc[segment, "Churn_numeric"].mean()
-    segment_share = segment.mean()
-    segment_churn_share = df.loc[segment, "Churn_numeric"].sum() / len(churned)
-    st.subheader("Priority Customer Segment")
-    st.caption(f"A small group — {segment_share:.0%} of customers — accounts for {segment_churn_share:.0%} of all "
-               "cancellations. This is where retention effort pays off most.")
-    col1, col2 = st.columns([1, 2])
+    # --- 2. Drill-down tree ---------------------------------------------------
+    st.subheader("2 · Where Churn Is Concentrated")
+    st.caption("We split the customer base one trait at a time and follow the riskiest branch. "
+               "Each box shows how many customers are in the group and what share of them cancelled.")
+
+    levels = [
+        ("Month-to-month contract", "1- or 2-year contract", df["Contract"] == "Month-to-month"),
+        ("Fiber optic internet", "DSL or no internet", df["InternetService"] == "Fiber optic"),
+        ("Customer for under 12 months", "12 months or longer", df["tenure"] < 12),
+        ("No security or support add-on", "Has security or support", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
+    ]
+    reds = sns.color_palette("Reds", 101).as_hex()
+
+    def node(name, label, mask, highlight):
+        n, rate = group_stats(mask)
+        fill = reds[min(int(rate * 100), 100)] if highlight else "#EEEEEE"
+        font = "white" if highlight and rate > 0.45 else "black"
+        return (f'{name} [label="{label}\\n{n:,} customers\\n{rate:.0%} cancelled", '
+                f'fillcolor="{fill}", fontcolor="{font}"];')
+
+    current = pd.Series(True, index=df.index)
+    dot = ['digraph { rankdir=LR; node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11]; '
+           'edge [color="#999999"];', node("n0", "All customers", current, True)]
+    for i, (risk_label, other_label, condition) in enumerate(levels, 1):
+        dot.append(node(f"n{i}", risk_label, current & condition, True))
+        dot.append(node(f"o{i}", other_label, current & ~condition, False))
+        dot.append(f"n{i - 1} -> n{i}; n{i - 1} -> o{i};")
+        current = current & condition
+    dot.append("}")
+    st.graphviz_chart("\n".join(dot), width="stretch")
+
+    segment_n, segment_rate = group_stats(current)
+    segment_churn_share = df.loc[current, "Churn_numeric"].sum() / len(churned)
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Priority segment", f"{segment_n:,} customers", f"{current.mean():.1%} of all customers", delta_color="off")
+    s2.metric("Cancellation rate", f"{segment_rate:.0%}", f"{segment_rate / churn_rate:.1f}× the average", delta_color="off")
+    s3.metric("Share of all cancellations", f"{segment_churn_share:.0%}")
+
+    st.divider()
+
+    # --- 3. Drivers -----------------------------------------------------------
+    st.subheader("3 · Why Customers Cancel")
+    st.caption("Cancellation rate of the higher-risk group versus everyone else, for each factor. "
+               "The bigger the gap, the stronger the factor. Gender is shown for comparison — it makes no difference.")
+
+    drivers = [
+        ("Contract", "Month-to-month", "1–2 year", df["Contract"] == "Month-to-month", None),
+        ("Security / support", "No add-on", "Has add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No"),
+         df["InternetService"] != "No"),
+        ("Customer tenure", "Under 12 months", "12+ months", df["tenure"] < 12, None),
+        ("Payment method", "Electronic check", "Other methods", df["PaymentMethod"] == "Electronic check", None),
+        ("Internet service", "Fiber optic", "DSL", df["InternetService"] == "Fiber optic", df["InternetService"] != "No"),
+        ("Gender", "Male", "Female", df["gender"] == "Male", None),
+    ]
+    rows = []
+    for factor, risk_name, other_name, risk_mask, scope in drivers:
+        scope = pd.Series(True, index=df.index) if scope is None else scope
+        rows.append((factor, risk_name, group_stats(scope & risk_mask)[1] * 100,
+                     other_name, group_stats(scope & ~risk_mask)[1] * 100))
+
+    fig, ax = plt.subplots(figsize=(8, 3.6))
+    y = np.arange(len(rows))
+    risk_vals, other_vals = [r[2] for r in rows], [r[4] for r in rows]
+    ax.barh(y - 0.2, risk_vals, height=0.4, color=["#C44E52"] * (len(rows) - 1) + ["#BFBFBF"])
+    ax.barh(y + 0.2, other_vals, height=0.4, color="#D9D9D9")
+    for yi, (_, risk_name, risk_val, other_name, other_val) in enumerate(rows):
+        ax.text(risk_val + 1, yi - 0.2, f"{risk_name}  {risk_val:.0f}%", va="center", fontsize=8)
+        ax.text(other_val + 1, yi + 0.2, f"{other_name}  {other_val:.0f}%", va="center", fontsize=8, color="#666666")
+    ax.set_yticks(y)
+    ax.set_yticklabels([r[0] for r in rows])
+    ax.set_xlim(0, 70)
+    ax.set_xlabel("Share of customers who cancelled (%)")
+    ax.invert_yaxis()
+    ax.spines[["top", "right"]].set_visible(False)
+    col1, _ = st.columns([3, 1])
     with col1:
-        fig, ax = plt.subplots(figsize=(3, 3))
-        ax.pie([segment_churn_share, 1 - segment_churn_share], labels=["Priority\nsegment", "All other\ncustomers"],
-               colors=["#C44E52", "#D9D9D9"], startangle=90, counterclock=False,
-               wedgeprops=dict(width=0.4), autopct="%.0f%%", pctdistance=0.8)
-        ax.set_title("Share of all cancellations", fontsize=10)
         st.pyplot(fig)
-    with col2:
-        s1, s2, s3 = st.columns(3)
-        s1.metric("Customers in segment", f"{int(segment.sum()):,}")
-        s2.metric("Cancellation rate", f"{segment_rate:.0%}")
-        s3.metric("Compared with average", f"{segment_rate / churn_rate:.1f}× higher")
+
+    f1, f2, f3 = st.columns(3)
+    f1.warning("**No long-term commitment**\n\nMonth-to-month customers can leave at any time")
+    f2.warning("**No added value**\n\nCustomers without security or support add-ons have less reason to stay")
+    f3.warning("**Early in the relationship**\n\nNew customers have not yet built loyalty")
 
     st.divider()
 
@@ -124,14 +182,14 @@ with tab_exec:
     n_test, n_leavers = eval_results["n_test"], eval_results["n_churn_test"]
     cv_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
 
-    st.subheader("Model Evaluation")
+    st.subheader("4 · Can We Predict Who Will Leave?")
     st.caption("We built a model that scores each customer's risk of leaving, then tested it on customers it had "
                "never seen before.")
 
     e1, e2, e3 = st.columns(3)
-    e1.info(f"**1 · Learn**\n\nThe model learned from {len(df) - n_test:,} past customers")
-    e2.info(f"**2 · Test**\n\nWe checked it on {n_test:,} different customers whose outcome we already knew")
-    e3.info("**3 · Re-test**\n\nWe repeated the test 5 times on different groups to make sure the result holds")
+    e1.info(f"**Learn**\n\nThe model learned from {len(df) - n_test:,} past customers")
+    e2.info(f"**Test**\n\nWe checked it on {n_test:,} different customers whose outcome we already knew")
+    e3.info("**Re-test**\n\nWe repeated the test 5 times on different groups to make sure the result holds")
 
     col1, col2 = st.columns([3, 2])
     with col1:
