@@ -92,6 +92,8 @@ def get_evaluation_results(_df: pd.DataFrame):
         "importance_df": importance_df,
         "n_test": len(y_test),
         "n_churn_test": int(y_test.sum()),
+        "y_test": y_test.to_numpy(),
+        "lr_test_proba": log_reg.predict_proba(X_test)[:, 1],
     }
 
 

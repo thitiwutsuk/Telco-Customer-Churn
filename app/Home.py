@@ -92,34 +92,35 @@ with tab_exec:
 
     # --- 2. Drill-down tree ---------------------------------------------------
     st.subheader("2 · Where Churn Is Concentrated")
-    st.caption("We split the customer base one trait at a time and follow the riskiest branch. "
-               "Each box shows how many customers are in the group and what share of them cancelled.")
+    st.caption("Each step keeps only the riskier customers. The group gets smaller, the cancellation rate goes up.")
 
     levels = [
-        ("Month-to-month contract", "1- or 2-year contract", df["Contract"] == "Month-to-month"),
-        ("Fiber optic internet", "DSL or no internet", df["InternetService"] == "Fiber optic"),
-        ("Customer for under 12 months", "12 months or longer", df["tenure"] < 12),
-        ("No security or support add-on", "Has security or support", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
+        ("All customers", pd.Series(True, index=df.index)),
+        ("+ Month-to-month contract", df["Contract"] == "Month-to-month"),
+        ("+ Fiber optic internet", df["InternetService"] == "Fiber optic"),
+        ("+ Customer under 12 months", df["tenure"] < 12),
+        ("+ No security or support add-on", (df["OnlineSecurity"] == "No") & (df["TechSupport"] == "No")),
     ]
-    reds = sns.color_palette("Reds", 101).as_hex()
-
-    def node(name, label, mask, highlight):
-        n, rate = group_stats(mask)
-        fill = reds[min(int(rate * 100), 100)] if highlight else "#EEEEEE"
-        font = "white" if highlight and rate > 0.45 else "black"
-        return (f'{name} [label="{label}\\n{n:,} customers\\n{rate:.0%} cancelled", '
-                f'fillcolor="{fill}", fontcolor="{font}"];')
-
     current = pd.Series(True, index=df.index)
-    dot = ['digraph { rankdir=LR; node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11]; '
-           'edge [color="#999999"];', node("n0", "All customers", current, True)]
-    for i, (risk_label, other_label, condition) in enumerate(levels, 1):
-        dot.append(node(f"n{i}", risk_label, current & condition, True))
-        dot.append(node(f"o{i}", other_label, current & ~condition, False))
-        dot.append(f"n{i - 1} -> n{i}; n{i - 1} -> o{i};")
+    funnel = []
+    for label, condition in levels:
         current = current & condition
-    dot.append("}")
-    st.graphviz_chart("\n".join(dot), width="stretch")
+        funnel.append((label, *group_stats(current)))
+
+    reds = sns.color_palette("Reds", 101)
+    widest = funnel[0][1]
+    fig, ax = plt.subplots(figsize=(8, 3.4))
+    for i, (label, n, rate) in enumerate(funnel):
+        ax.barh(i, n, left=(widest - n) / 2, height=0.8, color=reds[min(int(rate * 100) + 15, 100)])
+        ax.text(-widest * 0.02, i, label, ha="right", va="center", fontsize=10)
+        ax.text(widest * 1.02, i, f"{n:,} customers  ·  {rate:.0%} cancel", ha="left", va="center",
+                fontsize=10, fontweight="bold" if i == len(funnel) - 1 else "normal")
+    ax.set_xlim(0, widest)
+    ax.invert_yaxis()
+    ax.axis("off")
+    col1, _ = st.columns([4, 1])
+    with col1:
+        st.pyplot(fig)
 
     segment_n, segment_rate = group_stats(current)
     segment_churn_share = df.loc[current, "Churn_numeric"].sum() / len(churned)
@@ -178,57 +179,45 @@ with tab_exec:
 
     # --- 4. Model evaluation --------------------------------------------------
     eval_results = get_evaluation_results(df)
-    metrics = eval_results["metrics_df"]
     cm = eval_results["confusion_matrices"]["Logistic Regression"]
-    caught, missed, false_alarms = cm[1, 1], cm[1, 0], cm[0, 1]
+    caught, missed = cm[1, 1], cm[1, 0]
     n_test, n_leavers = eval_results["n_test"], eval_results["n_churn_test"]
     cv_recall = get_robustness_results(df)["cv_results"]["Logistic Regression"]["test_recall"]
 
     st.subheader("4 · Can We Predict Who Will Leave?")
-    st.caption("We built a model that scores each customer's risk of leaving, then tested it on customers it had "
-               "never seen before.")
+    st.caption(f"Tested on {n_test:,} customers the model had never seen, and re-tested 5 times "
+               f"(results varied by only ± {cv_recall.std() * 100:.1f} pts).")
 
-    st.markdown(
-        f"**How we tested it:** the model learned from {len(df) - n_test:,} past customers, was then checked on "
-        f"{n_test:,} different customers whose outcome we already knew, and the test was repeated 5 times on "
-        "different groups to make sure the result holds."
-    )
-
-    col1, col2 = st.columns([3, 2])
+    col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Two models compared — we chose the one that catches more leavers**")
-        plain_names = {
-            "Recall (churn)": "Leavers correctly flagged",
-            "Precision (churn)": "Alerts that were correct",
-            "Accuracy": "All predictions correct",
-        }
-        compare = metrics[list(plain_names)].rename(columns=plain_names).T * 100
-        fig, ax = plt.subplots(figsize=(5.5, 2.8))
-        y = np.arange(len(compare))
-        ax.barh(y - 0.2, compare["Logistic Regression"], height=0.4, color="#4C72B0", label="Selected model")
-        ax.barh(y + 0.2, compare["Random Forest"], height=0.4, color="#BFBFBF", label="Alternative model")
-        for yi, (sel, alt) in enumerate(zip(compare["Logistic Regression"], compare["Random Forest"])):
-            ax.text(sel + 1, yi - 0.2, f"{sel:.0f}%", va="center", fontsize=8)
-            ax.text(alt + 1, yi + 0.2, f"{alt:.0f}%", va="center", fontsize=8)
-        ax.set_yticks(y)
-        ax.set_yticklabels(compare.index)
+        st.markdown(f"**Of {n_leavers:,} customers who left, the model flagged {caught / n_leavers:.0%}**")
+        fig, ax = plt.subplots(figsize=(5, 1.1))
+        ax.barh([0], [caught], color="#4C72B0")
+        ax.barh([0], [missed], left=[caught], color="#D9D9D9")
+        ax.text(caught / 2, 0, f"Flagged {caught:,}", ha="center", va="center", color="white", fontsize=10)
+        ax.text(caught + missed / 2, 0, f"Missed {missed:,}", ha="center", va="center", fontsize=10)
+        ax.set_xlim(0, n_leavers)
+        ax.axis("off")
+        st.pyplot(fig)
+
+    contact_share = 0.2
+    y_test, proba = eval_results["y_test"], eval_results["lr_test_proba"]
+    top = np.argsort(-proba)[: int(len(y_test) * contact_share)]
+    reached = y_test[top].sum() / y_test.sum()
+    with col2:
+        st.markdown(f"**Contacting 1 in 5 customers reaches {reached:.0%} of leavers — "
+                    f"{reached / contact_share:.1f}× better than random**")
+        fig, ax = plt.subplots(figsize=(5, 1.6))
+        ax.barh([0, 1], [contact_share * 100, reached * 100], color=["#BFBFBF", "#4C72B0"], height=0.6)
+        for yi, v in enumerate([contact_share * 100, reached * 100]):
+            ax.text(v + 1, yi, f"{v:.0f}% of leavers", va="center", fontsize=10)
+        ax.set_yticks([0, 1])
+        ax.set_yticklabels(["Random", "Model-guided"])
         ax.set_xlim(0, 100)
         ax.invert_yaxis()
-        ax.legend(fontsize=7, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False)
-        ax.spines[["top", "right"]].set_visible(False)
+        ax.spines[["top", "right", "bottom"]].set_visible(False)
+        ax.set_xticks([])
         st.pyplot(fig)
-    with col2:
-        st.markdown(f"**Test result on {n_leavers:,} customers who actually left**")
-        r1, r2 = st.columns(2)
-        r1.metric("Correctly flagged", f"{caught:,}", f"{caught / n_leavers:.0%}", delta_color="off")
-        r2.metric("Missed", f"{missed:,}", f"{missed / n_leavers:.0%}", delta_color="off")
-        r3, r4 = st.columns(2)
-        r3.metric("False alarms", f"{false_alarms:,}", help="Customers flagged as at risk who actually stayed")
-        r4.metric("Consistency (5 re-tests)", f"± {cv_recall.std() * 100:.1f} pts",
-                  help="How much the share of leavers flagged changed across the 5 re-tests")
-
-    st.caption("Why we chose this model: missing a customer who is about to leave costs us their revenue, while a "
-               "false alarm only costs a retention offer. So we picked the model that catches the most leavers.")
 
     st.divider()
 
