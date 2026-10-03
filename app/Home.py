@@ -169,14 +169,12 @@ with tab_problem:
     st.header("Problem Statement")
     st.markdown(
         f"""
-**{churn_rate:.1%} of our customers have cancelled their service** — roughly 1 in 4. Together, the customers
-we lost were billing **{lost_billing:,.0f} per month**, equal to **{lost_share:.1%} of our total monthly
-charges**.
+**{churn_rate:.1%} of our customers have cancelled their service**, about 1 in 4. Together, these customers
+accounted for **{lost_share:.1%} of our total monthly billing**.
 
-Our retention activity today is not targeted. We have no systematic way to tell which customers are about
-to leave or why, so retention offers are either sent too broadly — spending budget on customers who would
-have stayed — or reach at-risk customers too late. Since winning a new customer costs considerably more than
-keeping an existing one, every avoidable cancellation is a direct loss.
+Right now we cannot tell which customers are about to leave, or why. As a result, retention offers are either
+sent too broadly, which wastes budget on customers who would have stayed, or they reach at-risk customers too
+late.
 """
     )
 
@@ -198,10 +196,11 @@ keeping an existing one, every avoidable cancellation is a direct loss.
 """
         )
     with col2:
-        st.markdown("**Objective**")
+        st.markdown("**This project aims to**")
         st.markdown(
-            "Give the retention team a clear, evidence-based view of churn drivers and a risk score for every "
-            "customer, so retention budget goes to the customers most likely to leave."
+            "1. Identify the factors that drive customers to cancel\n"
+            "2. Build a model that scores each customer's risk of leaving, so retention efforts can focus on the "
+            "customers most likely to churn"
         )
         st.markdown("**Success criteria**")
         st.markdown(
