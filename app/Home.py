@@ -33,6 +33,58 @@ def finding(text, so_what):
 
 df = load_clean_data()
 
+def render_problem_statement(heading, show_metrics=True):
+    """Problem statement shared by the Executive Brief and Overview tabs."""
+    churned = df[df["Churn_numeric"] == 1]
+    n_customers, n_churned = len(df), len(churned)
+    churn_rate = n_churned / n_customers
+    lost_billing = churned["MonthlyCharges"].sum()
+    lost_share = lost_billing / df["MonthlyCharges"].sum()
+
+    heading("Problem Statement")
+    st.markdown(
+        f"""
+**{churn_rate:.1%} of our customers have cancelled their service**, about 1 in 4. Together, these customers
+accounted for **{lost_share:.1%} of our total monthly billing**.
+
+Right now we cannot tell which customers are about to leave, or why. As a result, retention offers are either
+sent too broadly, which wastes budget on customers who would have stayed, or they reach at-risk customers too
+late.
+"""
+    )
+
+    if show_metrics:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Customers in scope", f"{n_customers:,}")
+        c2.metric("Customers lost", f"{n_churned:,}")
+        c3.metric("Churn rate", f"{churn_rate:.1%}")
+        c4.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Questions this report answers**")
+        st.markdown(
+            """
+1. **Who** is leaving?
+2. **Why** are they leaving?
+3. **When** in the customer lifetime does it happen?
+4. **Can we identify** at-risk customers before they leave?
+"""
+        )
+    with col2:
+        st.markdown("**This project aims to**")
+        st.markdown(
+            "1. Identify the factors that drive customers to cancel\n"
+            "2. Build a model that scores each customer's risk of leaving, so retention efforts can focus on the "
+            "customers most likely to churn"
+        )
+        st.markdown("**Success criteria**")
+        st.markdown(
+            "The model must catch the majority of customers who actually leave — missing a churner costs more "
+            "than contacting a customer who would have stayed."
+        )
+
+
 st.title("Customer Churn Analysis")
 
 tab_exec, tab_problem, tab_eda, tab_models, tab_predict = st.tabs(
@@ -50,6 +102,10 @@ with tab_exec:
 
     def group_stats(mask):
         return int(mask.sum()), df.loc[mask, "Churn_numeric"].mean()
+
+    render_problem_statement(st.subheader, show_metrics=False)
+
+    st.divider()
 
     # --- 1. Big picture -------------------------------------------------------
     st.subheader("1 · Customer Overview")
@@ -166,47 +222,7 @@ with tab_problem:
                "active and former customer accounts")
 
     # --- Problem statement ---------------------------------------------------
-    st.header("Problem Statement")
-    st.markdown(
-        f"""
-**{churn_rate:.1%} of our customers have cancelled their service**, about 1 in 4. Together, these customers
-accounted for **{lost_share:.1%} of our total monthly billing**.
-
-Right now we cannot tell which customers are about to leave, or why. As a result, retention offers are either
-sent too broadly, which wastes budget on customers who would have stayed, or they reach at-risk customers too
-late.
-"""
-    )
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Customers in scope", f"{n_customers:,}")
-    c2.metric("Customers lost", f"{n_churned:,}")
-    c3.metric("Churn rate", f"{churn_rate:.1%}")
-    c4.metric("Monthly billing lost", f"{lost_billing:,.0f}", f"{lost_share:.1%} of total", delta_color="off")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Questions this report answers**")
-        st.markdown(
-            """
-1. **Who** is leaving?
-2. **Why** are they leaving?
-3. **When** in the customer lifetime does it happen?
-4. **Can we identify** at-risk customers before they leave?
-"""
-        )
-    with col2:
-        st.markdown("**This project aims to**")
-        st.markdown(
-            "1. Identify the factors that drive customers to cancel\n"
-            "2. Build a model that scores each customer's risk of leaving, so retention efforts can focus on the "
-            "customers most likely to churn"
-        )
-        st.markdown("**Success criteria**")
-        st.markdown(
-            "The model must catch the majority of customers who actually leave — missing a churner costs more "
-            "than contacting a customer who would have stayed."
-        )
+    render_problem_statement(st.header)
 
     st.divider()
 
